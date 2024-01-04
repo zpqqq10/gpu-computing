@@ -30,7 +30,7 @@
 #include <stdio.h>
 
 using namespace std;
-#include "mat3f.h"
+#include "mat3f.cuh"
 #include "box.h"
 #include "crigid.h"
 
@@ -89,33 +89,38 @@ inline int project6(vec3f& ax,
 // very robust triangle intersection test
 // uses no divisions
 // works on coplanar triangles
-
-bool
-triContact(vec3f& P1, vec3f& P2, vec3f& P3, vec3f& Q1, vec3f& Q2, vec3f& Q3)
+// 分离轴定理
+bool triContact(vec3f& P1, vec3f& P2, vec3f& P3, vec3f& Q1, vec3f& Q2, vec3f& Q3)
 {
-	vec3f p1;
+	vec3f p1;			// default to be (0, 0, 0)
+	// relative coordinates, relative to p1(0, 0, 0)
 	vec3f p2 = P2 - P1;
 	vec3f p3 = P3 - P1;
 	vec3f q1 = Q1 - P1;
 	vec3f q2 = Q2 - P1;
 	vec3f q3 = Q3 - P1;
 
+	// edge of triangle 1
 	vec3f e1 = p2 - p1;
 	vec3f e2 = p3 - p2;
 	vec3f e3 = p1 - p3;
 
+	// edge of triangle 2
 	vec3f f1 = q2 - q1;
 	vec3f f2 = q3 - q2;
 	vec3f f3 = q1 - q3;
 
+	// normal of triangle 1
 	vec3f n1 = e1.cross(e2);
+	// normal of triangle 2
 	vec3f m1 = f1.cross(f2);
 
+	// axis
 	vec3f g1 = e1.cross(n1);
 	vec3f g2 = e2.cross(n1);
 	vec3f g3 = e3.cross(n1);
 
-	vec3f  h1 = f1.cross(m1);
+	vec3f h1 = f1.cross(m1);
 	vec3f h2 = f2.cross(m1);
 	vec3f h3 = f3.cross(m1);
 
@@ -152,9 +157,10 @@ triContact(vec3f& P1, vec3f& P2, vec3f& P3, vec3f& Q1, vec3f& Q2, vec3f& Q3)
 	return true;
 }
 
-void
-kmesh::collide(const kmesh* other, const transf& t0, const transf &t1, std::vector<id_pair>& rets)
+// TODO 试一下去掉printf对性能的影响
+void kmesh::collide(const kmesh* other, const transf& t0, const transf &t1, std::vector<id_pair>& rets)
 {
+	// check all the triangles pair by pair
 	for (int i = 0; i < _num_tri; i++) {
 		printf("checking %d of %d...\n", i, _num_tri);
 

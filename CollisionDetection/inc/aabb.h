@@ -27,8 +27,8 @@
 
 #pragma once
 
-#include "vec3f.h"
-#include "transf.h"
+#include "vec3f.cuh"
+#include "transf.cuh"
 #include <float.h>
 #include <vector>
 

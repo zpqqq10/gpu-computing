@@ -28,7 +28,7 @@
 #pragma once
 
 //****************************** add for linux ******************************//
-#define _MSC_VER 1800
+// #define _MSC_VER 1800
 #define __forceinline inline
 //****************************** add for linux ******************************//
 
@@ -36,6 +36,6 @@
 #if (_MSC_VER >= 1200)
 #define FORCEINLINE __forceinline
 #else
-#define FORCEINLINE __inline
+#define FORCEINLINE inline
 #endif
 #endif

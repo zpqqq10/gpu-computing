@@ -32,6 +32,7 @@
 #include <ostream>
 #include "forceline.h"
 #include "real.h"
+#include <cuda_runtime.h>
 
 #define     GLH_ZERO                REAL(0.0)
 #define     GLH_EPSILON          REAL(10e-6)
@@ -41,7 +42,7 @@
 #define GLH_LARGE_FLOAT REAL(1e18f)
 
 template <class T>
-FORCEINLINE void setMax2(T& a, const T& b)
+__device__ __host__ FORCEINLINE void setMax2(T& a, const T& b)
 {
 	if (a < b)
 	{
@@ -50,7 +51,7 @@ FORCEINLINE void setMax2(T& a, const T& b)
 }
 
 template <class T>
-FORCEINLINE void setMin2(T& a, const T& b)
+__device__ __host__ FORCEINLINE void setMin2(T& a, const T& b)
 {
 	if (b < a)
 	{
@@ -58,22 +59,22 @@ FORCEINLINE void setMin2(T& a, const T& b)
 	}
 }
 
-inline REAL lerp(REAL a, REAL b, REAL t)
+__device__ __host__ inline REAL lerp(REAL a, REAL b, REAL t)
 {
 	return a + t*(b - a);
 }
 
 #ifdef USE_DOUBLE
-inline REAL fmax(REAL a, REAL b) {
+__device__ __host__ inline REAL fmax(REAL a, REAL b) {
 	return (a > b) ? a : b;
 }
 
-inline REAL fmin(REAL a, REAL b) {
+__device__ __host__ inline REAL fmin(REAL a, REAL b) {
 	return (a < b) ? a : b;
 }
 #endif
 
-inline bool isEqual( REAL a, REAL b, REAL tol=GLH_EPSILON )
+__device__ __host__ inline bool isEqual( REAL a, REAL b, REAL tol=GLH_EPSILON )
 {
     return fabs( a - b ) < tol;
 }
@@ -99,42 +100,42 @@ public:
 		};
 	};
 
-	FORCEINLINE vec2f ()
+	__device__ __host__ FORCEINLINE vec2f ()
 	{x=0; y=0;}
 
-	FORCEINLINE vec2f(const vec2f &v)
+	__device__ __host__ FORCEINLINE vec2f(const vec2f &v)
 	{
 		x = v.x;
 		y = v.y;
 	}
 
-	FORCEINLINE vec2f(const REAL *v)
+	__device__ __host__ FORCEINLINE vec2f(const REAL *v)
 	{
 		x = v[0];
 		y = v[1];
 	}
 
-	FORCEINLINE vec2f(REAL x, REAL y)
+	__device__ __host__ FORCEINLINE vec2f(REAL x, REAL y)
 	{
 		this->x = x;
 		this->y = y;
 	}
 
-	FORCEINLINE REAL operator [] ( int i ) const {return v[i];}
-	FORCEINLINE REAL &operator [] (int i) { return v[i]; }
+	__device__ __host__ FORCEINLINE REAL operator [] ( int i ) const {return v[i];}
+	__device__ __host__ FORCEINLINE REAL &operator [] (int i) { return v[i]; }
 
-	FORCEINLINE vec2f operator- (const vec2f &v) const
+	__device__ __host__ FORCEINLINE vec2f operator- (const vec2f &v) const
 	{
 		return vec2f(x - v.x, y - v.y);
 	}
 
 	// cross product
-	FORCEINLINE REAL cross(const vec2f &vec) const
+	__device__ __host__ FORCEINLINE REAL cross(const vec2f &vec) const
 	{
 		return x*vec.y - y*vec.x;
 	}
 
-	FORCEINLINE REAL dot(const vec2f &vec) const {
+	__device__ __host__ FORCEINLINE REAL dot(const vec2f &vec) const {
 		return x*vec.x + y*vec.y;
 	}
 };
@@ -150,107 +151,107 @@ public:
 		};
 	};
 
-	FORCEINLINE vec3f ()
+	__device__ __host__ FORCEINLINE vec3f ()
 	{x=0; y=0; z=0;}
 
-	FORCEINLINE vec3f(const vec3f &v)
+	__device__ __host__ FORCEINLINE vec3f(const vec3f &v)
 	{
 		x = v.x;
 		y = v.y;
 		z = v.z;
 	}
 
-	FORCEINLINE vec3f(const REAL *v)
+	__device__ __host__ FORCEINLINE vec3f(const REAL *v)
 	{
 		x = v[0];
 		y = v[1];
 		z = v[2];
 	}
 
-	FORCEINLINE vec3f(REAL x, REAL y, REAL z)
+	__device__ __host__ FORCEINLINE vec3f(REAL x, REAL y, REAL z)
 	{
 		this->x = x;
 		this->y = y;
 		this->z = z;
 	}
 
-	FORCEINLINE REAL operator [] ( int i ) const {return v[i];}
-	FORCEINLINE REAL &operator [] (int i) { return v[i]; }
+	__device__ __host__ FORCEINLINE REAL operator [] ( int i ) const {return v[i];}
+	__device__ __host__ FORCEINLINE REAL &operator [] (int i) { return v[i]; }
 
-	FORCEINLINE vec3f &operator += (const vec3f &v) {
+	__device__ __host__ FORCEINLINE vec3f &operator += (const vec3f &v) {
 		x += v.x;
 		y += v.y;
 		z += v.z;
 		return *this;
 	}
 
-	FORCEINLINE vec3f &operator -= (const vec3f &v) {
+	__device__ __host__ FORCEINLINE vec3f &operator -= (const vec3f &v) {
 		x -= v.x;
 		y -= v.y;
 		z -= v.z;
 		return *this;
 	}
 
-	FORCEINLINE vec3f &operator *= (REAL t) {
+	__device__ __host__ FORCEINLINE vec3f &operator *= (REAL t) {
 		x *= t;
 		y *= t;
 		z *= t;
 		return *this;
 	}
 
-	FORCEINLINE vec3f &operator /= (REAL t) {
+	__device__ __host__ FORCEINLINE vec3f &operator /= (REAL t) {
 		x /= t;
 		y /= t;
 		z /= t;
 		return *this;
 	}
 
-	FORCEINLINE void negate() {
+	__device__ __host__ FORCEINLINE void negate() {
 		x = -x;
 		y = -y;
 		z = -z;
 	}
 
-	FORCEINLINE vec3f absolute() const
+	__device__ __host__ FORCEINLINE vec3f absolute() const
 	{
 		return vec3f(fabs(x), fabs(y), fabs(z));
 	}
 
-	FORCEINLINE vec3f operator - () const {
+	__device__ __host__ FORCEINLINE vec3f operator - () const {
 		return vec3f(-x, -y, -z);
 	}
 
-	FORCEINLINE vec3f operator+ (const vec3f &v) const
+	__device__ __host__ FORCEINLINE vec3f operator+ (const vec3f &v) const
 	{
 		return vec3f(x+v.x, y+v.y, z+v.z);
 	}
 
-	FORCEINLINE vec3f operator- (const vec3f &v) const
+	__device__ __host__ FORCEINLINE vec3f operator- (const vec3f &v) const
 	{
 		return vec3f(x-v.x, y-v.y, z-v.z);
 	}
 
-	FORCEINLINE vec3f operator *(REAL t) const
+	__device__ __host__ FORCEINLINE vec3f operator *(REAL t) const
 	{
 		return vec3f(x*t, y*t, z*t);
 	}
 
-	FORCEINLINE vec3f operator /(REAL t) const
+	__device__ __host__ FORCEINLINE vec3f operator /(REAL t) const
 	{
 		return vec3f(x/t, y/t, z/t);
 	}
 
      // cross product
-     FORCEINLINE const vec3f cross(const vec3f &vec) const
+     __device__ __host__ FORCEINLINE const vec3f cross(const vec3f &vec) const
      {
           return vec3f(y*vec.z - z*vec.y, z*vec.x - x*vec.z, x*vec.y - y*vec.x);
      }
 
-	 FORCEINLINE REAL dot(const vec3f &vec) const {
+	 __device__ __host__ FORCEINLINE REAL dot(const vec3f &vec) const {
 		 return x*vec.x+y*vec.y+z*vec.z;
 	 }
 
-	 FORCEINLINE void normalize() 
+	 __device__ __host__ FORCEINLINE void normalize() 
 	 { 
 		 REAL sum = x*x+y*y+z*z;
 		 if (sum > GLH_EPSILON_2) {
@@ -261,40 +262,40 @@ public:
 		 }
 	 }
 
-	 FORCEINLINE REAL length() const {
+	 __device__ __host__ FORCEINLINE REAL length() const {
 		 return REAL(sqrt(x*x + y*y + z*z));
 	 }
 
-	 FORCEINLINE vec3f getUnit() const {
+	 __device__ __host__ FORCEINLINE vec3f getUnit() const {
 		 return (*this)/length();
 	 }
 
-	FORCEINLINE bool isUnit() const {
+	__device__ __host__ FORCEINLINE bool isUnit() const {
 		return isEqual( squareLength(), 1.f );
 	}
 
     //! max(|x|,|y|,|z|)
-	FORCEINLINE REAL infinityNorm() const
+	__device__ __host__ FORCEINLINE REAL infinityNorm() const
 	{
 		return fmax(fmax( fabs(x), fabs(y) ), fabs(z));
 	}
 
-	FORCEINLINE vec3f & set_value( const REAL &vx, const REAL &vy, const REAL &vz)
+	__device__ __host__ FORCEINLINE vec3f & set_value( const REAL &vx, const REAL &vy, const REAL &vz)
 	{ x = vx; y = vy; z = vz; return *this; }
 
-	FORCEINLINE bool equal_abs(const vec3f &other) {
+	__device__ __host__ FORCEINLINE bool equal_abs(const vec3f &other) {
 		return x == other.x && y == other.y && z == other.z;
 	}
 
-	FORCEINLINE REAL squareLength() const {
+	__device__ __host__ FORCEINLINE REAL squareLength() const {
 		return x*x+y*y+z*z;
 	}
 
-	FORCEINLINE REAL length2() const {
+	__device__ __host__ FORCEINLINE REAL length2() const {
 		return x * x + y * y + z * z;
 	}
 
-	FORCEINLINE vec3f  dot3(const vec3f& v0, const vec3f& v1, const vec3f& v2) const
+	__device__ __host__ FORCEINLINE vec3f  dot3(const vec3f& v0, const vec3f& v1, const vec3f& v2) const
 	{
 		return vec3f(dot(v0), dot(v1), dot(v2));
 	}
@@ -302,7 +303,7 @@ public:
 	/**@brief Set each element to the max of the current values and the values of another btVector3
  * @param other The other btVector3 to compare with
  */
-	FORCEINLINE void	setMax(const vec3f& other)
+	__device__ __host__ FORCEINLINE void	setMax(const vec3f& other)
 	{
 		setMax2(x, other.x);
 		setMax2(y, other.y);
@@ -312,19 +313,19 @@ public:
 	/**@brief Set each element to the min of the current values and the values of another btVector3
  * @param other The other btVector3 to compare with
  */
-	FORCEINLINE void	setMin(const vec3f& other)
+	__device__ __host__ FORCEINLINE void	setMin(const vec3f& other)
 	{
 		setMin2(x, other.x);
 		setMin2(y, other.y);
 		setMin2(z, other.z);
 	}
 
-	static vec3f zero() {
+	__device__ __host__ static vec3f zero() {
 		return vec3f(0.f, 0.f, 0.f);
 	}
 
     //! Named constructor: retrieve vector for nth axis
-	static vec3f axis( int n ) {
+	__device__ __host__ static vec3f axis( int n ) {
 		assert( n < 3 );
 		switch( n ) {
 			case 0: {
@@ -341,39 +342,39 @@ public:
 	}
 
     //! Named constructor: retrieve vector for x axis
-	static vec3f xAxis() { return vec3f(1.f, 0.f, 0.f); }
+	__device__ __host__ static vec3f xAxis() { return vec3f(1.f, 0.f, 0.f); }
     //! Named constructor: retrieve vector for y axis
-	static vec3f yAxis() { return vec3f(0.f, 1.f, 0.f); }
+	__device__ __host__ static vec3f yAxis() { return vec3f(0.f, 1.f, 0.f); }
     //! Named constructor: retrieve vector for z axis
-	static vec3f zAxis() { return vec3f(0.f, 0.f, 1.f); }
+	__device__ __host__ static vec3f zAxis() { return vec3f(0.f, 0.f, 1.f); }
 
 };
 
-inline vec3f operator * (REAL t, const vec3f &v) {
+__device__ __host__ inline vec3f operator * (REAL t, const vec3f &v) {
 	return vec3f(v.x*t, v.y*t, v.z*t);
 }
 
-inline vec3f interp(const vec3f &a, const vec3f &b, REAL t)
+__device__ __host__ inline vec3f interp(const vec3f &a, const vec3f &b, REAL t)
 {
 	return a*(1-t)+b*t;
 }
 
-inline vec3f vinterp(const vec3f &a, const vec3f &b, REAL t)
+__device__ __host__ inline vec3f vinterp(const vec3f &a, const vec3f &b, REAL t)
 {
 	return a*t+b*(1-t);
 }
 
-inline vec3f interp(const vec3f &a, const vec3f &b, const vec3f &c, REAL u, REAL v, REAL w)
+__device__ __host__ inline vec3f interp(const vec3f &a, const vec3f &b, const vec3f &c, REAL u, REAL v, REAL w)
 {
 	return a*u+b*v+c*w;
 }
 
-inline REAL clamp(REAL f, REAL a, REAL b)
+__device__ __host__ inline REAL clamp(REAL f, REAL a, REAL b)
 {
 	return fmax(a, fmin(f, b));
 }
 
-inline REAL vdistance(const vec3f &a, const vec3f &b)
+__device__ __host__ inline REAL vdistance(const vec3f &a, const vec3f &b)
 {
 	return (a-b).length();
 }
@@ -387,7 +388,7 @@ inline std::ostream& operator<<( std::ostream&os, const vec3f &v ) {
 #define CLAMP(a, b, c)		if((a)<(b)) (a)=(b); else if((a)>(c)) (a)=(c)
 
 
-FORCEINLINE void
+__device__ __host__ FORCEINLINE void
 vmin(vec3f &a, const vec3f &b)
 {
 	a.set_value(
@@ -396,7 +397,7 @@ vmin(vec3f &a, const vec3f &b)
 		fmin(a[2], b[2]));
 }
 
-FORCEINLINE void
+__device__ __host__ FORCEINLINE void
 vmax(vec3f &a, const vec3f &b)
 {
 	a.set_value(
@@ -405,14 +406,14 @@ vmax(vec3f &a, const vec3f &b)
 		fmax(a[2], b[2]));
 }
 
-FORCEINLINE vec3f lerp(const vec3f &a, const vec3f &b, REAL t)
+__device__ __host__ FORCEINLINE vec3f lerp(const vec3f &a, const vec3f &b, REAL t)
 {
 	return a + t*(b - a);
 }
 
 
 /**@brief Return the elementwise product of two vectors */
-FORCEINLINE vec3f operator*(const vec3f& v1, const vec3f& v2)
+__device__ __host__ FORCEINLINE vec3f operator*(const vec3f& v1, const vec3f& v2)
 {
 	return vec3f(
 		v1.x * v2.x,

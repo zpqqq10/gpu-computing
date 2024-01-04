@@ -28,11 +28,11 @@
 #pragma once
 
 #include <stdio.h>
-#include "vec3f.h"
-#include "mat3f.h"
-#include "transf.h"
+#include "vec3f.cuh"
+#include "mat3f.cuh"
+#include "transf.cuh"
 
-#include "tri.h"
+#include "tri3f.cuh"
 #include "box.h"
 #include "pair.h"
 
@@ -44,8 +44,8 @@ class kmesh {
 public:
 	unsigned int _num_vtx;
 	unsigned int _num_tri;
-	tri3f *_tris;
-	vec3f *_vtxs;
+	tri3f *_tris;			// triangles
+	vec3f *_vtxs;			// vertices
 
 	vec3f* _fnrms;
 	vec3f *_nrms;
@@ -122,7 +122,7 @@ public:
 
 		_bx.init();
 
-		for (int i = 0; i < _num_tri; i++) {
+		for (unsigned int i = 0; i < _num_tri; i++) {
 			tri3f &a = _tris[i];
 			vec3f p0 = _vtxs[a.id0()];
 			vec3f p1 = _vtxs[a.id1()];
@@ -169,7 +169,7 @@ public:
 
 
 	~crigid() {
-		NULL;
+		;
 	}
 
 	void setID(int i) { _id = i; }
@@ -227,3 +227,8 @@ public:
 
 };
 
+void beginDraw(BOX &);
+void endDraw();
+void drawCDPair(crigid* r0, crigid* r1, std::vector<id_pair>& pairs);
+void drawCDPair(crigid* r0, crigid* r1, thrust::host_vector<int>& faces0, thrust::host_vector<int>& faces1);
+void drawRigid(crigid*, bool cyl, int level, vec3f &);

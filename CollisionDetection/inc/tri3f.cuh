@@ -27,28 +27,32 @@
 
 #pragma once
 #include "forceline.h"
+#include <cuda_runtime.h>
 
+// triangle, storing three vertex indices
 class tri3f {
 public:
 	unsigned int _ids[3];
 
-	FORCEINLINE tri3f() {
+	__device__ __host__ FORCEINLINE tri3f() {
+		// become the largest unsigned int
 		_ids[0] = _ids[1] = _ids[2] = -1;
 	}
 
-	FORCEINLINE tri3f(unsigned int id0, unsigned int id1, unsigned int id2) {
+	__device__ __host__ FORCEINLINE tri3f(unsigned int id0, unsigned int id1, unsigned int id2) {
 		set(id0, id1, id2);
 	}
 
-	FORCEINLINE void set(unsigned int id0, unsigned int id1, unsigned int id2) {
+	__device__ __host__ FORCEINLINE void set(unsigned int id0, unsigned int id1, unsigned int id2) {
 		_ids[0] = id0;
 		_ids[1] = id1;
 		_ids[2] = id2;
 	}
 
-	FORCEINLINE unsigned int id(int i) { return _ids[i]; }
-	FORCEINLINE unsigned int id0() {return _ids[0];}
-	FORCEINLINE unsigned int id1() {return _ids[1];}
-	FORCEINLINE unsigned int id2() {return _ids[2];}
+	__device__ __host__ FORCEINLINE unsigned int id(int i) { return _ids[i]; }
+	__device__ __host__ FORCEINLINE unsigned int id0() {return _ids[0];}
+	__device__ __host__ FORCEINLINE unsigned int id1() {return _ids[1];}
+	__device__ __host__ FORCEINLINE unsigned int id2() {return _ids[2];}
+	// std::swap is not suppotred in device
 	FORCEINLINE void reverse() {std::swap(_ids[0], _ids[2]);}
 };

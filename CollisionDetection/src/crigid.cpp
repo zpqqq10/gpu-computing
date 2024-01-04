@@ -33,6 +33,8 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <thrust/device_vector.h>
+#include <thrust/host_vector.h>
 
 #include "crigid.h"
 #include "box.h"
@@ -40,14 +42,10 @@
 #include <set>
 using namespace std;
 
-extern std::vector<int> fset;
-extern std::set<int> vset;
-extern vec3f projDir;
-extern REAL maxDist;
-
 // for fopen
 #pragma warning(disable: 4996)
 
+// returning the normal of triangle (v1, v2, v3)
 inline vec3f update(vec3f &v1, vec3f &v2, vec3f &v3)
 {
 	vec3f s = (v2-v1);
@@ -147,8 +145,7 @@ void drawOther()
 {
 }
 
-void
-crigid::checkCollision(crigid *rb, std::vector<id_pair>&pairs)
+void crigid::checkCollision(crigid *rb, std::vector<id_pair>&pairs)
 {
 	crigid* ra = this;
 	const transf& trfA = ra->getTrf();
@@ -157,7 +154,6 @@ crigid::checkCollision(crigid *rb, std::vector<id_pair>&pairs)
 
 	ra->getMesh()->collide(rb->getMesh(), trfA, trfB, pairs);
 }
-
 
 
 void beginDraw(BOX& bx)
@@ -236,6 +232,63 @@ void drawCDPair(crigid* r0, crigid* r1, std::vector<id_pair>& pairs)
 			p0 = t1.getVertex(v0);
 			p1 = t1.getVertex(v1);
 			p2 = t1.getVertex(v2);
+#ifdef USE_DOUBLE
+			glVertex3dv(p0.v);
+			glVertex3dv(p1.v);
+			glVertex3dv(p2.v);
+#else
+			glVertex3fv(p0.v);
+			glVertex3fv(p1.v);
+			glVertex3fv(p2.v);
+#endif
+
+		}
+		glEnd();
+	}
+
+	glEnable(GL_LIGHTING);
+}
+
+void drawCDPair(crigid* r0, crigid* r1, thrust::host_vector<int>& faces0, thrust::host_vector<int>& faces1)
+{
+	if (faces0.size() == 0)
+		return;
+
+	transf& t0 = r0->getWorldTransform();
+	transf& t1 = r1->getWorldTransform();
+	kmesh* km0 = r0->getMesh();
+	kmesh* km1 = r1->getMesh();
+
+	glDisable(GL_LIGHTING);
+	{
+		glColor3f(1, 0, 0);
+		glBegin(GL_TRIANGLES);
+		// draw collided faces in r0
+		for (auto fid0 : faces0) {
+			vec3f v0, v1, v2;
+			km0->getTriangleVtxs(fid0, v0, v1, v2);
+			vec3f p0 = t0.getVertex(v0);
+			vec3f p1 = t0.getVertex(v1);
+			vec3f p2 = t0.getVertex(v2);
+
+#ifdef USE_DOUBLE
+			glVertex3dv(p0.v);
+			glVertex3dv(p1.v);
+			glVertex3dv(p2.v);
+#else
+			glVertex3fv(p0.v);
+			glVertex3fv(p1.v);
+			glVertex3fv(p2.v);
+#endif
+
+		}
+		// draw collided faces in r1
+		for (auto fid1 : faces1) {
+			vec3f v0, v1, v2;
+			km1->getTriangleVtxs(fid1, v0, v1, v2);
+			vec3f p0 = t1.getVertex(v0);
+			vec3f p1 = t1.getVertex(v1);
+			vec3f p2 = t1.getVertex(v2);
 #ifdef USE_DOUBLE
 			glVertex3dv(p0.v);
 			glVertex3dv(p1.v);

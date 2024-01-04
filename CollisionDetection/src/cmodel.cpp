@@ -25,17 +25,17 @@
 //	SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //**************************************************************************************
 
+#include <thrust/device_vector.h>
+#include <thrust/host_vector.h>
+
 using namespace std;
-#include "mat3f.h"
+#include "mat3f.cuh"
 #include "box.h"
 #include "crigid.h"
 #include "pair.h"
 #include <stdio.h>
 #include <omp.h>
-#include <mutex>
 
-// mutex to lock critical region
-std::mutex mylock;
 
 #ifdef PROF
 //#if defined(PROF) || defined(GPU)
@@ -98,13 +98,6 @@ public:
 
 #pragma warning(disable: 4996)
 
-extern void drawSdfPair(crigid* r0, crigid* r1, std::vector<vec3f>& pairs);
-extern void drawMinPair(crigid* r0, crigid* r1, std::vector<vec3f>&pairs);
-extern void drawCDPair(crigid* r0, crigid* r1, std::vector<id_pair>& pairs);
-extern void drawRigid(crigid*, bool cyl, int level, vec3f &);
-extern void drawPlanes(bool);
-extern float getLargestVelocityNorm(crigid* body1, crigid* body2);
-
 
 BOX g_box;
 BOX g_projBx;
@@ -114,7 +107,6 @@ extern bool verb;
 
 vec3f projDir(0.0f, -1.0f, 0.0f);
 REAL maxDist = 20.0;
-static int sidx = 0;
 
 class cscene {
 	std::vector<kmesh*> _meshs;
@@ -155,6 +147,21 @@ public:
 	void draw(int level, bool showCD, bool showBody, bool showOnly) {
 		if (showCD) {
 			drawCDPair(_rigids[0], _rigids[1], cdPairs);
+		}
+
+		if (showBody) {
+			for (auto r : _rigids) {
+				vec3f off;
+				drawRigid(r, false, level, off);
+				if (showOnly)
+					break;
+			}
+		}
+	}
+
+	void draw_gpu(int level, bool showCD, bool showBody, bool showOnly) {
+		if (showCD) {
+			drawCDPair(_rigids[0], _rigids[1], cdFaces0, cdFaces1);
 		}
 
 		if (showBody) {
@@ -223,7 +230,9 @@ public:
 	}
 
 	//for collision detection
-	std::vector<id_pair> cdPairs, cdPairs2;
+	std::vector<id_pair> cdPairs;
+	// collided faces of the two objects
+	thrust::host_vector<int> cdFaces0, cdFaces1;
 } g_scene;
 
 vec3f dPt0, dPt1, dPtw;
@@ -306,7 +315,7 @@ bool readobjfile(const char *path,
 		texs = NULL;
 	else {
 		texs = new vec2f[numTex];
-		for (unsigned int i = 0; i < numTex; i++)
+		for (int i = 0; i < numTex; i++)
 			texs[i] = texset[i];
 	}
 
@@ -320,7 +329,7 @@ bool readobjfile(const char *path,
 		ttris = NULL;
 	else {
 		ttris = new tri3f[numTTri];
-		for (unsigned int i = 0; i < numTTri; i++)
+		for (int i = 0; i < numTTri; i++)
 			ttris[i] = ttriset[i];
 	}
 
@@ -393,13 +402,10 @@ void quitModel()
 	g_scene.clear();
 }
 
-extern void beginDraw(BOX &);
-extern void endDraw();
-
 void drawOther();
 
 void drawBVH(int level) {
-	NULL;
+	return ;
 }
 
 void setMat(int i, int id);
@@ -422,8 +428,6 @@ extern double totalQuery;
 
 bool dynamicModel(char*, bool, bool)
 {
-	static int st = 0;
-
 	{
 		crigid* body = g_scene.getRigid(0);
 		transf& trf = body->getWorldTransform();
