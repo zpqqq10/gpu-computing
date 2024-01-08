@@ -33,7 +33,7 @@
 #include <GL/glh_glut.h>
 #include <omp.h>
 #include <stdio.h>
-
+#include "forceline.h"
 
 //****************************** add for linux ******************************//
 #include <time.h>
@@ -429,34 +429,16 @@ void usage_self_cd() {
 double totalQuery = 0;
 bool verb = false; // true;
 
-extern int device_query_main(int argc, char **argv);
-
-#ifdef PROF
 int main(int argc, char **argv) {
   if (argc < 3) {
     printf("usage: %s model1.obj model2\n", argv[0]);
     return -1;
   }
-
-  // device_query_main(argc, argv);
-
-  initModel(argv[1], argv[2]);
-
-  totalQuery = 0;
-  verb = false;
-  int steps = 350;
-  for (int i = 0; i < steps; i++)
-    key1();
-
-  //	printf("#average query time: %3.5f ms\n", totalQuery/double(steps));
-  printf("#average query time: %3.5f ms\n", totalQuery * 1000 / double(steps));
-}
+#ifdef USE_GPU
+  printf("Using GPU.\n");
 #else
-int main(int argc, char **argv) {
-  if (argc < 3) {
-    printf("usage: %s model1.obj model2\n", argv[0]);
-    return -1;
-  }
+  printf("Using CPU.\n");
+#endif
 
   usage_self_cd();
 
@@ -490,7 +472,6 @@ int main(int argc, char **argv) {
   quit();
   return 0;
 }
-#endif
 
 void CaptureScreen(int Width, int Height) {
 #ifdef WIN32

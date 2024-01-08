@@ -39,3 +39,5 @@
 #define FORCEINLINE inline
 #endif
 #endif
+
+#define USE_GPU

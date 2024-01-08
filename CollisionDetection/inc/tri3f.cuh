@@ -53,6 +53,14 @@ public:
 	__device__ __host__ FORCEINLINE unsigned int id0() {return _ids[0];}
 	__device__ __host__ FORCEINLINE unsigned int id1() {return _ids[1];}
 	__device__ __host__ FORCEINLINE unsigned int id2() {return _ids[2];}
+	__device__ __host__ FORCEINLINE unsigned int id0() const {return _ids[0];}
+	__device__ __host__ FORCEINLINE unsigned int id1() const {return _ids[1];}
+	__device__ __host__ FORCEINLINE unsigned int id2() const {return _ids[2];}
 	// std::swap is not suppotred in device
 	FORCEINLINE void reverse() {std::swap(_ids[0], _ids[2]);}
 };
+
+inline std::ostream& operator<<( std::ostream&os, const tri3f &tri ) {
+	os << "(" << tri._ids[0]<< ", " << tri._ids[1] << ", " << tri._ids[2] << ")" << std::endl;
+	return os;
+}

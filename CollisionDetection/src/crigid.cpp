@@ -62,6 +62,16 @@ update(tri3f &tri, vec3f *vtxs)
 	return update(v1, v2, v3);
 }
 
+inline vec3f
+update(tri3f &tri, thrust::host_vector<vec3f>& vtxs)
+{
+	vec3f &v1 = vtxs[tri.id0()];
+	vec3f &v2 = vtxs[tri.id1()];
+	vec3f &v3 = vtxs[tri.id2()];
+
+	return update(v1, v2, v3);
+}
+
 void kmesh::updateNrms()
 {
 	if (_fnrms == nullptr)
@@ -104,14 +114,14 @@ void kmesh::displayStatic(bool cyl, int level)
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glEnableClientState(GL_NORMAL_ARRAY);
 #ifdef USE_DOUBLE
-	glVertexPointer(3, GL_DOUBLE, sizeof(REAL) * 3, _vtxs);
+	glVertexPointer(3, GL_DOUBLE, sizeof(REAL) * 3, _vtxs.data());
 	glNormalPointer(GL_DOUBLE, sizeof(REAL) * 3, _nrms);
 #else
-	glVertexPointer(3, GL_FLOAT, sizeof(REAL) * 3, _vtxs);
+	glVertexPointer(3, GL_FLOAT, sizeof(REAL) * 3, _vtxs.data());
 	glNormalPointer(GL_FLOAT, sizeof(REAL) * 3, _nrms);
 #endif
 
-	glDrawElements(GL_TRIANGLES, _num_tri * 3, GL_UNSIGNED_INT, _tris);
+	glDrawElements(GL_TRIANGLES, _num_tri * 3, GL_UNSIGNED_INT, _tris.data());
 
 	glDisableClientState(GL_VERTEX_ARRAY);
 	glDisableClientState(GL_NORMAL_ARRAY);
@@ -139,8 +149,6 @@ void kmesh::updateDL(bool cyl, int level)
 	glEndList();
 }
 
-extern std::vector<vec3f> vtxset;
-
 void drawOther()
 {
 }
@@ -153,6 +161,16 @@ void crigid::checkCollision(crigid *rb, std::vector<id_pair>&pairs)
 	//const transf trfA2B = trfB.inverse() * trfA;
 
 	ra->getMesh()->collide(rb->getMesh(), trfA, trfB, pairs);
+}
+
+void crigid::checkCollision(crigid *rb, thrust::host_vector<int>&face0, thrust::host_vector<int>&face1)
+{
+	crigid* ra = this;
+	const transf& trfA = ra->getTrf();
+	const transf& trfB = rb->getTrf();
+	//const transf trfA2B = trfB.inverse() * trfA;
+
+	ra->getMesh()->collide(rb->getMesh(), trfA, trfB, face0, face1);
 }
 
 

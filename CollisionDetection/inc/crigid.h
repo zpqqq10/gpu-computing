@@ -38,27 +38,30 @@
 
 #include <set>
 #include <vector>
+#include <thrust/device_vector.h>
+#include <thrust/host_vector.h>
 using namespace std;
 
 class kmesh {
 public:
-	unsigned int _num_vtx;
-	unsigned int _num_tri;
-	tri3f *_tris;			// triangles
-	vec3f *_vtxs;			// vertices
+	unsigned int _num_vtx;	// number of vertices
+	unsigned int _num_tri;  // number of triangles
+	thrust::host_vector<tri3f> _tris;			// array of triangles
+	thrust::host_vector<vec3f> _vtxs;			// array of vertices
 
-	vec3f* _fnrms;
-	vec3f *_nrms;
-	aabb *_bxs;
-	aabb _bx;
-	int _dl;
+	// thrust::host_vector<vec3f> _fnrms;			// array of face normals
+	// thrust::host_vector<vec3f> _nrms;			// array of vertex normals
+	// thrust::host_vector<aabb> _bxs;				// bboxes of each triangles
+	vec3f *_fnrms;			// array of face normals
+	vec3f *_nrms;			// array of vertex normals
+	aabb *_bxs;				// bboxes of each triangles
+	aabb _bx;				// bbox of the whole mesh
+	int _dl;				// display list
 
 public:
-	kmesh(unsigned int numVtx, unsigned int numTri, tri3f* tris, vec3f* vtxs, bool cyl) {
+	kmesh(unsigned int numVtx, unsigned int numTri, tri3f* tris, vec3f* vtxs, bool cyl): _tris(tris, tris + numTri), _vtxs(vtxs, vtxs + numVtx) {
 		_num_vtx = numVtx;
 		_num_tri = numTri;
-		_tris = tris;
-		_vtxs = vtxs;
 
 		_fnrms = nullptr;
 		_nrms = nullptr;
@@ -71,8 +74,6 @@ public:
 	}
 
 	~kmesh() {
-		delete[]_tris;
-		delete[]_vtxs;
 
 		if (_fnrms != nullptr)
 			delete[] _fnrms;
@@ -87,10 +88,12 @@ public:
 
 	unsigned int getNbVertices() const { return _num_vtx; }
 	unsigned int getNbFaces() const { return _num_tri; }
-	vec3f *getVtxs() const { return _vtxs; }
+	// vec3f *getVtxs() const { return _vtxs; }
+	thrust::host_vector<vec3f> getVtxs() const { return _vtxs; }
 	vec3f* getNrms() const { return _nrms; }
 	vec3f* getFNrms() const { return _fnrms; }
-	tri3f* getTris() const { return _tris; }
+	// tri3f* getTris() const { return _tris; }
+	thrust::host_vector<tri3f> getTris() const { return _tris; }
 
 	// calc norms, and prepare for display ...
 	void updateNrms();
@@ -106,11 +109,12 @@ public:
 	void destroyDL();
 
 	void collide(const kmesh* other, const transf& trf, const transf &trfOther, std::vector<id_pair>& rets);
+	void collide(const kmesh* other, const transf& trf, const transf &trfOther, thrust::host_vector<int>& faces0, thrust::host_vector<int>& faces1);
 
 
 	void getTriangleVtxs(int fid, vec3f& v0, vec3f& v1, vec3f& v2) const
 	{
-		tri3f& f = _tris[fid];
+		const tri3f& f = _tris[fid];
 		v0 = _vtxs[f.id0()];
 		v1 = _vtxs[f.id1()];
 		v2 = _vtxs[f.id2()];
@@ -215,6 +219,7 @@ public:
 	}
 
 	void checkCollision(crigid*, std::vector<id_pair>&);
+	void checkCollision(crigid *, thrust::host_vector<int>&, thrust::host_vector<int>&);
 
 	__forceinline transf& getWorldTransform() {
 		return _worldTrf;

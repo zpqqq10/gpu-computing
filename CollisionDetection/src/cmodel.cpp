@@ -36,64 +36,6 @@ using namespace std;
 #include <stdio.h>
 #include <omp.h>
 
-
-#ifdef PROF
-//#if defined(PROF) || defined(GPU)
-
-class myTimer {
-public:
-	myTimer(const char* msgIn) {}
-};
-
-
-class myTimer2
-{
-public:
-	myTimer2(const char* msgIn) {}
-
-	void print() {}
-
-	void inc(double delta) {}
-};
-
-#else
-
-class myTimer
-{
-	double t0;
-	char msg[512];
-public:
-	myTimer(const char* msgIn) {
-		t0 = omp_get_wtime();
-		strcpy(msg, msgIn);
-	}
-	~myTimer() {
-		double tdelta = omp_get_wtime() - t0;
-		printf("%s: %2.5f s\n", msg, tdelta);
-	}
-};
-
-class myTimer2
-{
-	double dt;
-	char msg[512];
-public:
-	myTimer2(const char* msgIn) {
-		dt = 0;
-		strcpy(msg, msgIn);
-	}
-
-	void print() {
-		printf("%s: %2.5f s\n", msg, dt);
-	}
-
-	void inc(double delta) {
-		dt += delta;
-	}
-};
-
-#endif
-
 #define BUNNY_SCALE 1.f
 
 #pragma warning(disable: 4996)
@@ -146,22 +88,11 @@ public:
 
 	void draw(int level, bool showCD, bool showBody, bool showOnly) {
 		if (showCD) {
-			drawCDPair(_rigids[0], _rigids[1], cdPairs);
-		}
-
-		if (showBody) {
-			for (auto r : _rigids) {
-				vec3f off;
-				drawRigid(r, false, level, off);
-				if (showOnly)
-					break;
-			}
-		}
-	}
-
-	void draw_gpu(int level, bool showCD, bool showBody, bool showOnly) {
-		if (showCD) {
+#ifdef USE_GPU
 			drawCDPair(_rigids[0], _rigids[1], cdFaces0, cdFaces1);
+#else
+			drawCDPair(_rigids[0], _rigids[1], cdPairs);
+#endif
 		}
 
 		if (showBody) {
@@ -235,8 +166,6 @@ public:
 	thrust::host_vector<int> cdFaces0, cdFaces1;
 } g_scene;
 
-vec3f dPt0, dPt1, dPtw;
-
 bool readobjfile(const char *path, 
 				 unsigned int &numVtx, unsigned int &numTri, 
 				 tri3f *&tris, vec3f *&vtxs, REAL scale, vec3f shift, bool swap_xyz, vec2f *&texs, tri3f *&ttris)
@@ -259,46 +188,43 @@ bool readobjfile(const char *path,
 					vtxset.push_back(vec3f(z, x, y)*scale+shift);
 				else
 					vtxset.push_back(vec3f(x, y, z)*scale+shift);
-		} else
+		} else if (buf[0] == 'v' && buf[1] == 't') {
+			double x, y;
+			sscanf(buf + 3, "%lf%lf", &x, &y);
 
-			if (buf[0] == 'v' && buf[1] == 't') {
-				double x, y;
-				sscanf(buf + 3, "%lf%lf", &x, &y);
+			texset.push_back(vec2f(x, y));
+		}
+		else if (buf[0] == 'f' && buf[1] == ' ') {
+			int id0, id1, id2, id3=0;
+			int tid0, tid1, tid2, tid3=0;
+			bool quad = false;
 
-				texset.push_back(vec2f(x, y));
+			int count = sscanf(buf+2, "%d/%d", &id0, &tid0);
+			char *nxt = strchr(buf+2, ' ');
+			sscanf(nxt+1, "%d/%d", &id1, &tid1);
+			nxt = strchr(nxt+1, ' ');
+			sscanf(nxt+1, "%d/%d", &id2, &tid2);
+
+			nxt = strchr(nxt+1, ' ');
+			if (nxt != NULL && nxt[1] >= '0' && nxt[1] <= '9') {// quad
+				if (sscanf(nxt+1, "%d/%d", &id3, &tid3))
+					quad = true;
 			}
-			else
-			if (buf[0] == 'f' && buf[1] == ' ') {
-				int id0, id1, id2, id3=0;
-				int tid0, tid1, tid2, tid3=0;
-				bool quad = false;
 
-				int count = sscanf(buf+2, "%d/%d", &id0, &tid0);
-				char *nxt = strchr(buf+2, ' ');
-				sscanf(nxt+1, "%d/%d", &id1, &tid1);
-				nxt = strchr(nxt+1, ' ');
-				sscanf(nxt+1, "%d/%d", &id2, &tid2);
+			id0--, id1--, id2--, id3--;
+			tid0--, tid1--, tid2--, tid3--;
 
-				nxt = strchr(nxt+1, ' ');
-				if (nxt != NULL && nxt[1] >= '0' && nxt[1] <= '9') {// quad
-					if (sscanf(nxt+1, "%d/%d", &id3, &tid3))
-						quad = true;
-				}
-
-				id0--, id1--, id2--, id3--;
-				tid0--, tid1--, tid2--, tid3--;
-
-				triset.push_back(tri3f(id0, id1, id2));
-				if (count == 2) {
-					ttriset.push_back(tri3f(tid0, tid1, tid2));
-				}
-
-				if (quad) {
-					triset.push_back(tri3f(id0, id2, id3));
-					if (count == 2)
-						ttriset.push_back(tri3f(tid0, tid2, tid3));
-				}
+			triset.push_back(tri3f(id0, id1, id2));
+			if (count == 2) {
+				ttriset.push_back(tri3f(tid0, tid1, tid2));
 			}
+
+			if (quad) {
+				triset.push_back(tri3f(id0, id2, id3));
+				if (count == 2)
+					ttriset.push_back(tri3f(tid0, tid2, tid3));
+			}
+		}
 	}
 	fclose(fp);
 
@@ -350,7 +276,7 @@ kmesh* initBunny(const char* ofile)
 	vec3f* vtxs = NULL;
 	tri3f* tris = NULL;
 	vec2f* texs = NULL;
-	tri3f* ttris = NULL;
+	tri3f* ttris = NULL; // quad
 
 	REAL scale = BUNNY_SCALE;
 	vec3f shift(0, 0, 0);
@@ -459,10 +385,18 @@ void checkCollision()
 	crigid* bodyA = g_scene.getRigid(0);
 	crigid* bodyB = g_scene.getRigid(1);
 
+#ifdef USE_GPU
+	g_scene.cdFaces0.clear();
+	g_scene.cdFaces1.clear();
+	bodyA->checkCollision(bodyB, g_scene.cdFaces0, g_scene.cdFaces1);
+	double tdelta = omp_get_wtime() - tstart;
+	printf("checkCollison (%zd and %zd) at %2.5f s\n", g_scene.cdFaces0.size(), g_scene.cdFaces1.size(), tdelta);
+#else
 	g_scene.cdPairs.clear();
 	bodyA->checkCollision(bodyB, g_scene.cdPairs);
 	double tdelta = omp_get_wtime() - tstart;
 	printf("checkCollison (%zd pairs) at %2.5f s\n", g_scene.cdPairs.size(), tdelta);
+#endif
 	totalQuery += tdelta;
 	return;
 }

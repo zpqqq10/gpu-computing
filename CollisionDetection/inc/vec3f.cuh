@@ -121,14 +121,6 @@ public:
 		this->y = y;
 	}
 
-	__device__ __host__ FORCEINLINE REAL operator [] ( int i ) const {return v[i];}
-	__device__ __host__ FORCEINLINE REAL &operator [] (int i) { return v[i]; }
-
-	__device__ __host__ FORCEINLINE vec2f operator- (const vec2f &v) const
-	{
-		return vec2f(x - v.x, y - v.y);
-	}
-
 	// cross product
 	__device__ __host__ FORCEINLINE REAL cross(const vec2f &vec) const
 	{
@@ -138,6 +130,16 @@ public:
 	__device__ __host__ FORCEINLINE REAL dot(const vec2f &vec) const {
 		return x*vec.x + y*vec.y;
 	}
+
+	__device__ __host__ FORCEINLINE REAL operator [] ( int i ) const {return v[i];}
+	__device__ __host__ FORCEINLINE REAL &operator [] (int i) { return v[i]; }
+
+	__device__ __host__ FORCEINLINE vec2f operator- (const vec2f &v) const
+	{
+		return vec2f(x - v.x, y - v.y);
+	}
+
+	
 };
 
 class vec3f {
