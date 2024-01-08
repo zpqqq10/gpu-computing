@@ -374,7 +374,7 @@ public:
 
 	/** @brief Get a row of the matrix as a vector
 	*  @param i Row number 0 indexed */
-	__device__ __host__ __forceinline const vec3f& getColumn(int i) const
+	__device__ __host__ __forceinline const vec3f getColumn(int i) const
 	{
 		assert(0 <= i && i < 3);
 		return vec3f(_data+i*3);

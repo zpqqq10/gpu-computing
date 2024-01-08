@@ -28,19 +28,21 @@
 #pragma once
 
 #include <stdio.h>
+#include <cuda_runtime.h>
+#include <thrust/host_vector.h>
+#include <thrust/transform.h>
 #include "vec3f.cuh"
 #include "mat3f.cuh"
 #include "transf.cuh"
 
 #include "tri3f.cuh"
-#include "box.h"
+#include "aabb.cuh"
 #include "pair.h"
 
 #include <set>
 #include <vector>
-#include <thrust/device_vector.h>
-#include <thrust/host_vector.h>
 using namespace std;
+
 
 class kmesh {
 public:
@@ -48,6 +50,7 @@ public:
 	unsigned int _num_tri;  // number of triangles
 	thrust::host_vector<tri3f> _tris;			// array of triangles
 	thrust::host_vector<vec3f> _vtxs;			// array of vertices
+	thrust::host_vector<Bsphere> _bsphs;		// array of bounding spheres
 
 	// thrust::host_vector<vec3f> _fnrms;			// array of face normals
 	// thrust::host_vector<vec3f> _nrms;			// array of vertex normals
@@ -62,6 +65,16 @@ public:
 	kmesh(unsigned int numVtx, unsigned int numTri, tri3f* tris, vec3f* vtxs, bool cyl): _tris(tris, tris + numTri), _vtxs(vtxs, vtxs + numVtx) {
 		_num_vtx = numVtx;
 		_num_tri = numTri;
+
+		_bsphs.resize(numTri);
+		for (unsigned int i = 0; i < numTri; i++) {
+			tri3f &a = _tris[i];
+			vec3f p0 = _vtxs[a.id0()];
+			vec3f p1 = _vtxs[a.id1()];
+			vec3f p2 = _vtxs[a.id2()];
+
+			_bsphs[i].init(p0, p1, p2);
+		}
 
 		_fnrms = nullptr;
 		_nrms = nullptr;
@@ -90,10 +103,11 @@ public:
 	unsigned int getNbFaces() const { return _num_tri; }
 	// vec3f *getVtxs() const { return _vtxs; }
 	thrust::host_vector<vec3f> getVtxs() const { return _vtxs; }
-	vec3f* getNrms() const { return _nrms; }
-	vec3f* getFNrms() const { return _fnrms; }
 	// tri3f* getTris() const { return _tris; }
 	thrust::host_vector<tri3f> getTris() const { return _tris; }
+	thrust::host_vector<Bsphere> getBsphs() const { return _bsphs; }
+	vec3f* getNrms() const { return _nrms; }
+	vec3f* getFNrms() const { return _fnrms; }
 
 	// calc norms, and prepare for display ...
 	void updateNrms();

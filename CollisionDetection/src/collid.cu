@@ -36,10 +36,10 @@
 
 using namespace std;
 #include "mat3f.cuh"
-#include "box.h"
-#include "crigid.h"
+#include "aabb.cuh"
+#include "crigid.cuh"
 #include "helper_cuda.h"
-
+const int SIZE = 16;
 
 __device__ __host__ inline double fmax(double a, double b, double c)
 {
@@ -98,7 +98,7 @@ __device__ __host__ inline int project6(const vec3f& ax,
 // works on coplanar triangles
 // 分离轴定理
 // 输出的bool存到一个数组里，数组的长度即为网格的三角形数目，值为0/1，代表这个面片是否发生了碰撞（和哪个面片发生了碰撞则不太重要）
-__device__ __host__ int triContact(vec3f& P1, vec3f& P2, vec3f& P3, vec3f& Q1, vec3f& Q2, vec3f& Q3)
+__device__ __host__ bool triContact(vec3f& P1, vec3f& P2, vec3f& P3, vec3f& Q1, vec3f& Q2, vec3f& Q3)
 {
 	vec3f p1;			// default to be (0, 0, 0)
 	// relative coordinates, relative to p1(0, 0, 0)
@@ -143,26 +143,26 @@ __device__ __host__ int triContact(vec3f& P1, vec3f& P2, vec3f& P3, vec3f& Q1, v
 	vec3f ef33 = e3.cross(f3);
 
 	// now begin the series of tests
-	if (!project3(n1, q1, q2, q3)) return 0;
-	if (!project3(m1, -q1, p2 - q1, p3 - q1)) return 0;
+	if (!project3(n1, q1, q2, q3)) return false;
+	if (!project3(m1, -q1, p2 - q1, p3 - q1)) return false;
 
-	if (!project6(ef11, p1, p2, p3, q1, q2, q3)) return 0;
-	if (!project6(ef12, p1, p2, p3, q1, q2, q3)) return 0;
-	if (!project6(ef13, p1, p2, p3, q1, q2, q3)) return 0;
-	if (!project6(ef21, p1, p2, p3, q1, q2, q3)) return 0;
-	if (!project6(ef22, p1, p2, p3, q1, q2, q3)) return 0;
-	if (!project6(ef23, p1, p2, p3, q1, q2, q3)) return 0;
-	if (!project6(ef31, p1, p2, p3, q1, q2, q3)) return 0;
-	if (!project6(ef32, p1, p2, p3, q1, q2, q3)) return 0;
-	if (!project6(ef33, p1, p2, p3, q1, q2, q3)) return 0;
-	if (!project6(g1, p1, p2, p3, q1, q2, q3)) return 0;
-	if (!project6(g2, p1, p2, p3, q1, q2, q3)) return 0;
-	if (!project6(g3, p1, p2, p3, q1, q2, q3)) return 0;
-	if (!project6(h1, p1, p2, p3, q1, q2, q3)) return 0;
-	if (!project6(h2, p1, p2, p3, q1, q2, q3)) return 0;
-	if (!project6(h3, p1, p2, p3, q1, q2, q3)) return 0;
+	if (!project6(ef11, p1, p2, p3, q1, q2, q3)) return false;
+	if (!project6(ef12, p1, p2, p3, q1, q2, q3)) return false;
+	if (!project6(ef13, p1, p2, p3, q1, q2, q3)) return false;
+	if (!project6(ef21, p1, p2, p3, q1, q2, q3)) return false;
+	if (!project6(ef22, p1, p2, p3, q1, q2, q3)) return false;
+	if (!project6(ef23, p1, p2, p3, q1, q2, q3)) return false;
+	if (!project6(ef31, p1, p2, p3, q1, q2, q3)) return false;
+	if (!project6(ef32, p1, p2, p3, q1, q2, q3)) return false;
+	if (!project6(ef33, p1, p2, p3, q1, q2, q3)) return false;
+	if (!project6(g1, p1, p2, p3, q1, q2, q3)) return false;
+	if (!project6(g2, p1, p2, p3, q1, q2, q3)) return false;
+	if (!project6(g3, p1, p2, p3, q1, q2, q3)) return false;
+	if (!project6(h1, p1, p2, p3, q1, q2, q3)) return false;
+	if (!project6(h2, p1, p2, p3, q1, q2, q3)) return false;
+	if (!project6(h3, p1, p2, p3, q1, q2, q3)) return false;
 
-	return 1;
+	return true;
 }
 
 // for cpu
@@ -192,27 +192,51 @@ void kmesh::collide(const kmesh* other, const transf& t0, const transf &t1, std:
 	}
 }
 
-// https://stackoverflow.com/questions/16196321/generate-cartesian-product-using-cuda-on-gpu
+// preprocess those related to triangles
+__global__ void preprocess_tris_kernel(Bsphere *bsphs, 
+									const unsigned int num_tris,
+									const transf *transforms
+									)
+{
+	int i = blockIdx.x * blockDim.x + threadIdx.x;
+	if (i >= num_tris) return;
+
+	const transf *t = transforms;
+	bsphs[i].setCenter(t->getVertex(bsphs[i].getCenter()));
+}
+
+// preprocess those related to vertices
+__global__ void preprocess_vtxs_kernel(const vec3f *vtxs, 
+								  	vec3f *tsfmed_vtxs, 		// transformed vertices
+									const unsigned int num_vtxs,
+									const transf *transforms
+									)
+{
+	int i = blockIdx.x * blockDim.x + threadIdx.x;
+	if (i >= num_vtxs) return;
+
+	const transf *t = transforms;
+	tsfmed_vtxs[i] = t->getVertex(vtxs[i]);
+}
+
 __global__ void collide_kernel(const tri3f *mesh0_tris, const tri3f *mesh1_tris, 
 							   const vec3f *mesh0_vtxs, const vec3f *mesh1_vtxs,
+							   const Bsphere *mesh0_bsphs, const Bsphere *mesh1_bsphs,
 							   const unsigned int mesh0_num_tri, const unsigned int mesh1_num_tri,
-							   const transf *transforms, 
-							   int *face0, int *face1)
+							   bool *face0, bool *face1)
 {
 	int i = blockIdx.x * blockDim.x + threadIdx.x;
 	int j = blockIdx.y * blockDim.y + threadIdx.y;
-	const transf *t0 = transforms;
-	const transf *t1 = transforms + 1;
-
 	if (i >= mesh0_num_tri || j >= mesh1_num_tri) return;
+	if (!mesh0_bsphs[i].overlaps(mesh1_bsphs[j])) return;
 
-	vec3f p0 = t0->getVertex(mesh0_vtxs[mesh0_tris[i].id0()]);
-	vec3f p1 = t0->getVertex(mesh0_vtxs[mesh0_tris[i].id1()]);
-	vec3f p2 = t0->getVertex(mesh0_vtxs[mesh0_tris[i].id2()]);
+	vec3f p0 = mesh0_vtxs[mesh0_tris[i].id0()];
+	vec3f p1 = mesh0_vtxs[mesh0_tris[i].id1()];
+	vec3f p2 = mesh0_vtxs[mesh0_tris[i].id2()];
 
-	vec3f q0 = t1->getVertex(mesh1_vtxs[mesh1_tris[j].id0()]);
-	vec3f q1 = t1->getVertex(mesh1_vtxs[mesh1_tris[j].id1()]);
-	vec3f q2 = t1->getVertex(mesh1_vtxs[mesh1_tris[j].id2()]);
+	vec3f q0 = mesh1_vtxs[mesh1_tris[j].id0()];
+	vec3f q1 = mesh1_vtxs[mesh1_tris[j].id1()];
+	vec3f q2 = mesh1_vtxs[mesh1_tris[j].id2()];
 
 	// error: collided faces may be set to 0 then
 	// face0[i] = face1[j] = triContact(p0, p1, p2, q0, q1, q2);
@@ -223,38 +247,75 @@ __global__ void collide_kernel(const tri3f *mesh0_tris, const tri3f *mesh1_tris,
 	}
 }
 
+static thrust::device_vector<tri3f> d_mesh0_tris;
+static thrust::device_vector<tri3f> d_mesh1_tris;
+static thrust::device_vector<vec3f> d_mesh0_vtxs;
+static thrust::device_vector<vec3f> d_mesh1_vtxs;
+
 // for GPU
 void kmesh::collide(const kmesh* other, const transf& trf, const transf &trfOther, thrust::host_vector<int>& faces0, thrust::host_vector<int>& faces1){
 	// in total: this->_num_tri * other->_num_tri
 	// warp: 32 * 32
 	// in face a combination of cartesian product
-	thrust::device_vector<tri3f> d_mesh0_tris = this->getTris();
-	thrust::device_vector<tri3f> d_mesh1_tris = other->getTris();
-	thrust::device_vector<vec3f> d_mesh0_vtxs = this->getVtxs();
-	thrust::device_vector<vec3f> d_mesh1_vtxs = other->getVtxs();
+	if(d_mesh0_tris.size() == 0 || d_mesh1_tris.size() == 0){
+		d_mesh0_tris = this->getTris();
+		d_mesh1_tris = other->getTris();
+		d_mesh0_vtxs = this->getVtxs();
+		d_mesh1_vtxs = other->getVtxs();
+	}
 	const unsigned int mesh0_num_tri = this->getNbFaces();
 	const unsigned int mesh1_num_tri = other->getNbFaces();
-	thrust::device_vector<int> d_face0(mesh0_num_tri, 0);
-	thrust::device_vector<int> d_face1(mesh1_num_tri, 0);
+	const unsigned int mesh0_num_vtx = this->getNbVertices();
+	const unsigned int mesh1_num_vtx = other->getNbVertices();
+	// custom object should be transferred explicitly to gpu
 	thrust::device_vector<transf> d_transforms(2);
 	d_transforms[0] = trf;
 	d_transforms[1] = trfOther;
 
+	// preprocess those related to triangles
+	thrust::device_vector<vec3f> d_mesh0_tsfmed_vtxs(mesh0_num_vtx);
+	thrust::device_vector<vec3f> d_mesh1_tsfmed_vtxs(mesh1_num_vtx);
+	preprocess_vtxs_kernel<<<(mesh0_num_tri + 32 - 1) / 32, 32>>>(
+		thrust::raw_pointer_cast(d_mesh0_vtxs.data()), thrust::raw_pointer_cast(d_mesh0_tsfmed_vtxs.data()),
+		mesh0_num_vtx, thrust::raw_pointer_cast(d_transforms.data())
+	);
+	preprocess_vtxs_kernel<<<(mesh0_num_tri + 32 - 1) / 32, 32>>>(
+		thrust::raw_pointer_cast(d_mesh1_vtxs.data()), thrust::raw_pointer_cast(d_mesh1_tsfmed_vtxs.data()),
+		mesh1_num_vtx, thrust::raw_pointer_cast(d_transforms.data()) + 1
+	);
+	cudaDeviceSynchronize();
+
+	getLastCudaError("preprocess vertices failed");
+
+	// preprocess those related to triangles
+	thrust::device_vector<Bsphere> d_mesh0_bsphs = this->getBsphs();
+	thrust::device_vector<Bsphere> d_mesh1_bsphs = other->getBsphs();
+	preprocess_tris_kernel<<<(mesh0_num_tri + 32 - 1) / 32, 32>>>(
+		thrust::raw_pointer_cast(d_mesh0_bsphs.data()), mesh0_num_tri, thrust::raw_pointer_cast(d_transforms.data())
+	);
+	preprocess_tris_kernel<<<(mesh1_num_tri + 32 - 1) / 32, 32>>>(
+		thrust::raw_pointer_cast(d_mesh1_bsphs.data()), mesh1_num_tri, thrust::raw_pointer_cast(d_transforms.data()) + 1
+	);
+	cudaDeviceSynchronize();
+
+	getLastCudaError("preprocess triangles failed");
+
 
 	// calculating block size and number of blocks
-	const int SIZE = 16;
 	dim3 block_size(SIZE, SIZE);
 	dim3 grid_size((mesh0_num_tri + block_size.x - 1) / block_size.x, (mesh1_num_tri + block_size.y - 1) / block_size.y);
-
-	getLastCudaError("before kernel");
+	
+	thrust::device_vector<bool> d_face0(mesh0_num_tri, 0);
+	thrust::device_vector<bool> d_face1(mesh1_num_tri, 0);
 
 	collide_kernel<<<grid_size, block_size>>>(
 		thrust::raw_pointer_cast(d_mesh0_tris.data()), thrust::raw_pointer_cast(d_mesh1_tris.data()), 
-		thrust::raw_pointer_cast(d_mesh0_vtxs.data()), thrust::raw_pointer_cast(d_mesh1_vtxs.data()), 
+		thrust::raw_pointer_cast(d_mesh0_tsfmed_vtxs.data()), thrust::raw_pointer_cast(d_mesh1_tsfmed_vtxs.data()), 
+		thrust::raw_pointer_cast(d_mesh0_bsphs.data()), thrust::raw_pointer_cast(d_mesh1_bsphs.data()),
 		mesh0_num_tri, mesh1_num_tri, 
-		thrust::raw_pointer_cast(d_transforms.data()),
 		thrust::raw_pointer_cast(d_face0.data()), thrust::raw_pointer_cast(d_face1.data())
 	);
+	cudaDeviceSynchronize();
 
 	getLastCudaError("collide_kernel failed");
 
@@ -282,6 +343,7 @@ void kmesh::collide(const kmesh* other, const transf& trf, const transf &trfOthe
 
 	getLastCudaError("reduce failed");
 
+	// gpu to cpu
 	faces0 = reduced_faces0;
 	faces1 = reduced_faces1;
 }

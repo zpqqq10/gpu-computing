@@ -14,7 +14,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(CMAKE_BUILD_TYPE "Release")
 set(CMAKE_CXX_FLAGS_DEBUG " $ENV{CXXFLAGS} -O0 -Wall -g -ggdb")
-set(CMAKE_CXX_FLAGS_RELEASE " $ENV{CXXFLAGS} -O3 -Wall ")
+set(CMAKE_CXX_FLAGS_RELEASE " $ENV{CXXFLAGS} -O3 -Wall")
 
 find_package(OpenMP REQUIRED)
 
@@ -44,11 +44,10 @@ file(GLOB HEADERS
     inc/mat3f.cuh
     inc/transf.cuh
 
-    inc/aabb.h
-    inc/box.h
+    inc/aaabb.cuh
 
     inc/tri3f.cuh
-    inc/crigid.h
+    inc/crigid.cuh
 
     inc/helper_string.h
     inc/helper_cuda.h

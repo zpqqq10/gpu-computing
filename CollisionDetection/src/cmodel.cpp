@@ -30,8 +30,8 @@
 
 using namespace std;
 #include "mat3f.cuh"
-#include "box.h"
-#include "crigid.h"
+#include "aabb.cuh"
+#include "crigid.cuh"
 #include "pair.h"
 #include <stdio.h>
 #include <omp.h>
@@ -42,8 +42,6 @@ using namespace std;
 
 
 BOX g_box;
-BOX g_projBx;
-REAL g_time = 0.0f;
 
 extern bool verb;
 
@@ -81,7 +79,7 @@ public:
 
 	FORCEINLINE void setID()
 	{
-		for (int i = 0; i < _rigids.size(); i++) {
+		for (long unsigned int i = 0; i < _rigids.size(); i++) {
 			_rigids[i]->setID(i);
 		}
 	}
@@ -119,7 +117,7 @@ public:
 			return false;
 
 		fprintf(fp, "%zd\n", _rigids.size());
-		for (int i = 0; i < _rigids.size(); i++) {
+		for (long unsigned int i = 0; i < _rigids.size(); i++) {
 			transf& trf = _rigids[i]->getWorldTransform();
 			vec3f& off = trf.getOrigin();
 			quaternion q = trf.getRotation();
@@ -162,7 +160,7 @@ public:
 
 	//for collision detection
 	std::vector<id_pair> cdPairs;
-	// collided faces of the two objects
+	// collided faces of the two objects, storing the face indices
 	thrust::host_vector<int> cdFaces0, cdFaces1;
 } g_scene;
 

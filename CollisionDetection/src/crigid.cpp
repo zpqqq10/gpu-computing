@@ -36,8 +36,8 @@
 #include <thrust/device_vector.h>
 #include <thrust/host_vector.h>
 
-#include "crigid.h"
-#include "box.h"
+#include "crigid.cuh"
+#include "aabb.cuh"
 
 #include <set>
 using namespace std;

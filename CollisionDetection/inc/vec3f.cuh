@@ -383,7 +383,7 @@ __device__ __host__ inline REAL vdistance(const vec3f &a, const vec3f &b)
 
 
 inline std::ostream& operator<<( std::ostream&os, const vec3f &v ) {
-	os << "(" << v.x << ", " << v.y << ", " << v.z << ")" << std::endl;
+	os << "(" << v.x << ", " << v.y << ", " << v.z << ")";
 	return os;
 }
 

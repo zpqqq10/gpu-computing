@@ -31,10 +31,13 @@
 #include "transf.cuh"
 #include <float.h>
 #include <vector>
+#include <cuda_runtime.h>
+
+#define BOX aabb
 
 class aabb {
 public:
-	FORCEINLINE void init() {
+	__device__ __host__ FORCEINLINE void init() {
 		_max = vec3f(-FLT_MAX, -FLT_MAX, -FLT_MAX);
 		_min = vec3f(FLT_MAX, FLT_MAX, FLT_MAX);
 	}
@@ -42,22 +45,22 @@ public:
 	vec3f _min;
 	vec3f _max;
 
-	FORCEINLINE aabb() {
+	__device__ __host__ FORCEINLINE aabb() {
 		init();
 	}
 
-	FORCEINLINE aabb(const vec3f &v) {
+	__device__ __host__ FORCEINLINE aabb(const vec3f &v) {
 		_min = _max = v;
 	}
 
-	FORCEINLINE aabb(const vec3f &a, const vec3f &b) {
+	__device__ __host__ FORCEINLINE aabb(const vec3f &a, const vec3f &b) {
 		_min = a;
 		_max = a;
 		vmin(_min, b);
 		vmax(_max, b);
 	}
 
-	FORCEINLINE bool overlaps(const aabb& b) const
+	__device__ __host__ FORCEINLINE bool overlaps(const aabb& b) const
 	{
 		if (_min[0] > b._max[0]) return false;
 		if (_min[1] > b._max[1]) return false;
@@ -70,7 +73,7 @@ public:
 		return true;
 	}
 
-	FORCEINLINE bool overlaps(const aabb& b, REAL tol) const
+	__device__ __host__ FORCEINLINE bool overlaps(const aabb& b, REAL tol) const
 	{
 		aabb aa = *this;
 		aabb bb = b;
@@ -80,7 +83,7 @@ public:
 		return aa.overlaps(bb);
 	}
 
-	FORCEINLINE bool overlaps(const aabb &b, aabb &ret) const
+	__device__ __host__ FORCEINLINE bool overlaps(const aabb &b, aabb &ret) const
 	{
 		if (!overlaps(b))
 			return false;
@@ -98,7 +101,7 @@ public:
 		return true;
 	}
 
-	FORCEINLINE bool inside(const vec3f &p) const
+	__device__ __host__ FORCEINLINE bool inside(const vec3f &p) const
 	{
 		if (p[0] < _min[0] || p[0] > _max[0]) return false;
 		if (p[1] < _min[1] || p[1] > _max[1]) return false;
@@ -107,47 +110,47 @@ public:
 		return true;
 	}
 
-	FORCEINLINE aabb &operator += (const vec3f &p)
+	__device__ __host__ FORCEINLINE aabb &operator += (const vec3f &p)
 	{
 		vmin(_min, p);
 		vmax(_max, p);
 		return *this;
 	}
 
-	FORCEINLINE aabb &operator += (const aabb &b)
+	__device__ __host__ FORCEINLINE aabb &operator += (const aabb &b)
 	{
 		vmin(_min, b._min);
 		vmax(_max, b._max);
 		return *this;
 	}
 
-	FORCEINLINE aabb operator + (const aabb &v) const
+	__device__ __host__ FORCEINLINE aabb operator + (const aabb &v) const
 	{
 		aabb rt(*this); return rt += v;
 	}
 
-	FORCEINLINE REAL width()  const { return _max[0] - _min[0]; }
-	FORCEINLINE REAL height() const { return _max[1] - _min[1]; }
-	FORCEINLINE REAL depth()  const { return _max[2] - _min[2]; }
-	FORCEINLINE vec3f center() const { return (_min + _max)*REAL(0.5); }
-	FORCEINLINE REAL volume() const { return width()*height()*depth(); }
+	__device__ __host__ FORCEINLINE REAL width()  const { return _max[0] - _min[0]; }
+	__device__ __host__ FORCEINLINE REAL height() const { return _max[1] - _min[1]; }
+	__device__ __host__ FORCEINLINE REAL depth()  const { return _max[2] - _min[2]; }
+	__device__ __host__ FORCEINLINE vec3f center() const { return (_min + _max)*REAL(0.5); }
+	__device__ __host__ FORCEINLINE REAL volume() const { return width()*height()*depth(); }
 
 
-	FORCEINLINE bool empty() const {
+	__device__ __host__ FORCEINLINE bool empty() const {
 		return _max[0] < _min[0];
 	}
 
-	FORCEINLINE void enlarge(REAL thickness) {
+	__device__ __host__ FORCEINLINE void enlarge(REAL thickness) {
 		_max += vec3f(thickness, thickness, thickness);
 		_min -= vec3f(thickness, thickness, thickness);
 	}
 
-	FORCEINLINE const vec3f &getMax() const { return _max; }
-	FORCEINLINE const vec3f &getMin() const { return _min; }
-	FORCEINLINE void setMax(vec3f& v) { _max = v; }
-	FORCEINLINE void setMin(vec3f& v) { _min = v; }
+	__device__ __host__ FORCEINLINE const vec3f &getMax() const { return _max; }
+	__device__ __host__ FORCEINLINE const vec3f &getMin() const { return _min; }
+	__device__ __host__ FORCEINLINE void setMax(vec3f& v) { _max = v; }
+	__device__ __host__ FORCEINLINE void setMin(vec3f& v) { _min = v; }
 
-	void getCorners(std::vector<vec3f> &crns) {
+	__device__ __host__ void getCorners(std::vector<vec3f> &crns) {
 		crns.push_back(_max);
 		crns.push_back(vec3f(_max.x, _max.y, _min.z));
 		crns.push_back(vec3f(_max.x, _min.y, _min.z));
@@ -159,7 +162,7 @@ public:
 	}
 
 	//! Apply a transform to an AABB
-	FORCEINLINE void applyTransform(const transf &trans)
+	__device__ __host__ FORCEINLINE void applyTransform(const transf &trans)
 	{
 		vec3f c =center();
 		vec3f extends = _max - c;
@@ -175,7 +178,7 @@ public:
 	}
 
 	//! Gets the extend and center
-	FORCEINLINE void getCenterExtend(vec3f & center, vec3f & extend)  const
+	__device__ __host__ FORCEINLINE void getCenterExtend(vec3f & center, vec3f & extend)  const
 	{
 		center = (_min + _max) * 0.5f;
 		extend = _max - center;
@@ -187,3 +190,80 @@ public:
 
 	void visualize();
 };
+
+
+// bounding sphere
+class Bsphere {
+public:
+	vec3f _center;
+	REAL _radius;
+
+
+	__device__ __host__ FORCEINLINE void init() {
+		_center = vec3f(0, 0, 0);
+		_radius = 0;
+	}
+
+	__device__ __host__ FORCEINLINE void init(const vec3f& p0, const vec3f& p1, const vec3f& p2) {
+		vec3f sum = p0 + p1 + p2;
+		_center = sum / 3.0;
+		_radius = fmax(
+				fmax((_center - p0).length(), (_center - p1).length()), 
+				(_center - p0).length());
+	}
+
+	__device__ __host__ FORCEINLINE Bsphere() {
+		init();
+	}
+
+	__device__ __host__ FORCEINLINE Bsphere(const Bsphere &b) {
+		_center = b._center;
+		_radius = b._radius;
+	}
+
+	__device__ __host__ FORCEINLINE bool overlaps(const Bsphere& b) const
+	{
+		REAL d = (_center - b._center).length();
+		return (d < (_radius + b._radius));
+	}
+
+	// get center
+	__device__ __host__ FORCEINLINE vec3f getCenter() const
+	{
+		return _center;
+	}
+
+	// get radius
+	__device__ __host__ FORCEINLINE REAL getRadius() const
+	{
+		return _radius;
+	}
+
+	__device__ __host__ FORCEINLINE void translate(const vec3f &v)
+	{
+		_center += v;
+	}
+
+	// set center
+	__device__ __host__ FORCEINLINE void setCenter(const vec3f &v)
+	{
+		_center = v;
+	}
+
+	__device__ __host__ FORCEINLINE void setRadius(REAL r)
+	{
+		_radius = r;
+	}
+
+
+	FORCEINLINE bool inside(const vec3f &p) const
+	{
+		return (_center - p).length() < _radius;
+	}
+
+};
+
+inline std::ostream& operator<<( std::ostream&os, const Bsphere &v ) {
+	os << "[" << v._center << ", " << v._radius << "]";
+	return os;
+}
