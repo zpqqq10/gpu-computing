@@ -31,6 +31,12 @@
 #include <cuda_runtime.h>
 #include <thrust/host_vector.h>
 #include <thrust/transform.h>
+#include <thrust/mr/allocator.h>
+#include <thrust/system/cuda/memory.h> // thrust::system::cuda::universal_host_pinned_memory_resource;
+// using pinned_allocator_type = thrust::mr::stateless_resource_allocator<T, thrust::universal_host_pinned_memory_resource>;
+// #include <thrust/system/cuda/experimental/pinned_allocator.h>
+// typedef thrust::cuda::experimental::pinned_allocator<T> pinned;
+
 #include "vec3f.cuh"
 #include "mat3f.cuh"
 #include "transf.cuh"
@@ -42,6 +48,10 @@
 #include <set>
 #include <vector>
 using namespace std;
+
+#define INT_PINNED    thrust::mr::stateless_resource_allocator<int, thrust::universal_host_pinned_memory_resource>
+#define FLOAT_PINNED  thrust::mr::stateless_resource_allocator<float, thrust::universal_host_pinned_memory_resource>
+#define DOUBLE_PINNED thrust::mr::stateless_resource_allocator<double, thrust::universal_host_pinned_memory_resource>
 
 
 class kmesh {
@@ -123,7 +133,7 @@ public:
 	void destroyDL();
 
 	void collide(const kmesh* other, const transf& trf, const transf &trfOther, std::vector<id_pair>& rets);
-	void collide(const kmesh* other, const transf& trf, const transf &trfOther, thrust::host_vector<int>& faces0, thrust::host_vector<int>& faces1);
+	void collide(const kmesh* other, const transf& trf, const transf &trfOther, thrust::host_vector<int, INT_PINNED>& faces0, thrust::host_vector<int, INT_PINNED>& faces1);
 
 
 	void getTriangleVtxs(int fid, vec3f& v0, vec3f& v1, vec3f& v2) const
@@ -233,7 +243,7 @@ public:
 	}
 
 	void checkCollision(crigid*, std::vector<id_pair>&);
-	void checkCollision(crigid *, thrust::host_vector<int>&, thrust::host_vector<int>&);
+	void checkCollision(crigid *, thrust::host_vector<int, INT_PINNED>&, thrust::host_vector<int, INT_PINNED>&);
 
 	__forceinline transf& getWorldTransform() {
 		return _worldTrf;
@@ -249,5 +259,5 @@ public:
 void beginDraw(BOX &);
 void endDraw();
 void drawCDPair(crigid* r0, crigid* r1, std::vector<id_pair>& pairs);
-void drawCDPair(crigid* r0, crigid* r1, thrust::host_vector<int>& faces0, thrust::host_vector<int>& faces1);
+void drawCDPair(crigid* r0, crigid* r1, thrust::host_vector<int, INT_PINNED>& faces0, thrust::host_vector<int, INT_PINNED>& faces1);
 void drawRigid(crigid*, bool cyl, int level, vec3f &);

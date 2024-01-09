@@ -163,7 +163,7 @@ void crigid::checkCollision(crigid *rb, std::vector<id_pair>&pairs)
 	ra->getMesh()->collide(rb->getMesh(), trfA, trfB, pairs);
 }
 
-void crigid::checkCollision(crigid *rb, thrust::host_vector<int>&face0, thrust::host_vector<int>&face1)
+void crigid::checkCollision(crigid *rb, thrust::host_vector<int, INT_PINNED>&face0, thrust::host_vector<int, INT_PINNED>&face1)
 {
 	crigid* ra = this;
 	const transf& trfA = ra->getTrf();
@@ -267,7 +267,7 @@ void drawCDPair(crigid* r0, crigid* r1, std::vector<id_pair>& pairs)
 	glEnable(GL_LIGHTING);
 }
 
-void drawCDPair(crigid* r0, crigid* r1, thrust::host_vector<int>& faces0, thrust::host_vector<int>& faces1)
+void drawCDPair(crigid* r0, crigid* r1, thrust::host_vector<int, INT_PINNED>& faces0, thrust::host_vector<int, INT_PINNED>& faces1)
 {
 	if (faces0.size() == 0)
 		return;

@@ -161,7 +161,7 @@ public:
 	//for collision detection
 	std::vector<id_pair> cdPairs;
 	// collided faces of the two objects, storing the face indices
-	thrust::host_vector<int> cdFaces0, cdFaces1;
+	thrust::host_vector<int, INT_PINNED> cdFaces0, cdFaces1;
 } g_scene;
 
 bool readobjfile(const char *path, 
@@ -384,8 +384,10 @@ void checkCollision()
 	crigid* bodyB = g_scene.getRigid(1);
 
 #ifdef USE_GPU
-	g_scene.cdFaces0.clear();
-	g_scene.cdFaces1.clear();
+	// host_vector in pinned_memory does not support clear()
+	// however, these 2 vectors are reset in collide(), clear() is not necessary
+	// g_scene.cdFaces0.clear();
+	// g_scene.cdFaces1.clear();
 	bodyA->checkCollision(bodyB, g_scene.cdFaces0, g_scene.cdFaces1);
 	double tdelta = omp_get_wtime() - tstart;
 	printf("checkCollison (%zd and %zd) at %2.5f s\n", g_scene.cdFaces0.size(), g_scene.cdFaces1.size(), tdelta);

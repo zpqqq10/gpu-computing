@@ -32,6 +32,9 @@
 #include <thrust/fill.h>
 #include <thrust/copy.h>
 #include <thrust/iterator/counting_iterator.h>
+#include <thrust/mr/allocator.h>
+#include <thrust/system/cuda/memory.h> // thrust::system::cuda::universal_host_pinned_memory_resource;
+#include <thrust/system/cuda/experimental/pinned_allocator.h>
 #include <stdio.h>
 
 using namespace std;
@@ -253,7 +256,7 @@ static thrust::device_vector<vec3f> d_mesh0_vtxs;
 static thrust::device_vector<vec3f> d_mesh1_vtxs;
 
 // for GPU
-void kmesh::collide(const kmesh* other, const transf& trf, const transf &trfOther, thrust::host_vector<int>& faces0, thrust::host_vector<int>& faces1){
+void kmesh::collide(const kmesh* other, const transf& trf, const transf &trfOther, thrust::host_vector<int, INT_PINNED>& faces0, thrust::host_vector<int, INT_PINNED>& faces1){
 	// in total: this->_num_tri * other->_num_tri
 	// warp: 32 * 32
 	// in face a combination of cartesian product
