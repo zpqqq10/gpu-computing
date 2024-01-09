@@ -209,7 +209,21 @@ public:
 		_center = sum / 3.0;
 		_radius = fmax(
 				fmax((_center - p0).length(), (_center - p1).length()), 
-				(_center - p0).length());
+				(_center - p0).length()) + 1e-6;
+	}
+
+	// https://zhuanlan.zhihu.com/p/457319176 welzl
+	__device__ __host__ FORCEINLINE void init_min(const vec3f& p0, const vec3f& p1, const vec3f& p2) {
+		vec3f a = p1 - p0;
+		vec3f b = p2 - p0;
+		vec3f c = p2 - p1;
+		vec3f a_x_b = a.cross(b);
+		REAL al = a.length();
+		REAL bl = b.length();
+		REAL cl = c.length();
+		_radius = (al * bl * cl) / (2 * a_x_b.length()) + 1e-6;
+		_center = p0 + (bl * bl * a_x_b.cross(a) + al * al * b.cross(a_x_b)) / (2 * a_x_b.length() * a_x_b.length());
+
 	}
 
 	__device__ __host__ FORCEINLINE Bsphere() {
@@ -223,8 +237,10 @@ public:
 
 	__device__ __host__ FORCEINLINE bool overlaps(const Bsphere& b) const
 	{
-		REAL d = (_center - b._center).length();
-		return (d < (_radius + b._radius));
+		// REAL d = (_center - b._center).length();
+		// return (d < (_radius + b._radius));
+		REAL d = (_center - b._center).length2();
+		return (d < ((_radius + b._radius) * (_radius + b._radius)));
 	}
 
 	// get center

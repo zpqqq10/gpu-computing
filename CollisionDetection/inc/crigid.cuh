@@ -64,11 +64,10 @@ public:
 
 	// thrust::host_vector<vec3f> _fnrms;			// array of face normals
 	// thrust::host_vector<vec3f> _nrms;			// array of vertex normals
-	// thrust::host_vector<aabb> _bxs;				// bboxes of each triangles
+	thrust::host_vector<BOX> _bxs;				// bboxes of each triangles
 	vec3f *_fnrms;			// array of face normals
 	vec3f *_nrms;			// array of vertex normals
-	aabb *_bxs;				// bboxes of each triangles
-	aabb _bx;				// bbox of the whole mesh
+	BOX _bx;				// bbox of the whole mesh
 	int _dl;				// display list
 
 public:
@@ -76,19 +75,20 @@ public:
 		_num_vtx = numVtx;
 		_num_tri = numTri;
 
-		_bsphs.resize(numTri);
-		for (unsigned int i = 0; i < numTri; i++) {
-			tri3f &a = _tris[i];
-			vec3f p0 = _vtxs[a.id0()];
-			vec3f p1 = _vtxs[a.id1()];
-			vec3f p2 = _vtxs[a.id2()];
+		// bounding sphere is slower than aabb, abandoned
+		// _bsphs.resize(numTri);
+		// for (unsigned int i = 0; i < numTri; i++) {
+		// 	tri3f &a = _tris[i];
+		// 	vec3f p0 = _vtxs[a.id0()];
+		// 	vec3f p1 = _vtxs[a.id1()];
+		// 	vec3f p2 = _vtxs[a.id2()];
 
-			_bsphs[i].init(p0, p1, p2);
-		}
+		// 	_bsphs[i].init_min(p0, p1, p2);
+		// }
 
 		_fnrms = nullptr;
 		_nrms = nullptr;
-		_bxs = nullptr;
+		// _bxs = nullptr;
 		_dl = -1;
 
 		updateNrms();
@@ -102,8 +102,6 @@ public:
 			delete[] _fnrms;
 		if (_nrms != nullptr)
 			delete[] _nrms;
-		if (_bxs != nullptr)
-			delete[] _bxs;
 		
 		destroyDL();
 	}
@@ -116,6 +114,7 @@ public:
 	// tri3f* getTris() const { return _tris; }
 	thrust::host_vector<tri3f> getTris() const { return _tris; }
 	thrust::host_vector<Bsphere> getBsphs() const { return _bsphs; }
+	thrust::host_vector<BOX> getBboxes() const { return _bxs; }
 	vec3f* getNrms() const { return _nrms; }
 	vec3f* getFNrms() const { return _fnrms; }
 
@@ -145,8 +144,10 @@ public:
 	}
 
 	void updateBxs() {
-		if (_bxs == nullptr)
-			_bxs = new aabb[_num_tri];
+		if (_bxs.size() == 0){
+			_bxs.resize(_num_tri);
+			// _bxs = new aabb[_num_tri];
+		}
 
 		_bx.init();
 
