@@ -196,21 +196,6 @@ void kmesh::collide(const kmesh* other, const transf& t0, const transf &t1, std:
 }
 
 // preprocess those related to triangles
-__global__ void preprocess_tris_kernel(const Bsphere *bsphs,
-									Bsphere *tsfmed_bsphs, 		// transformed bspheres
-									const unsigned int num_tris,
-									const transf *transforms
-									)
-{
-	int i = blockIdx.x * blockDim.x + threadIdx.x;
-	if (i >= num_tris) return;
-
-	const transf *t = transforms;
-	tsfmed_bsphs[i].setCenter(t->getVertex(bsphs[i].getCenter()));
-	tsfmed_bsphs[i].setRadius(bsphs[i].getRadius());
-}
-
-// preprocess those related to triangles
 __global__ void preprocess_tris_kernel(const BOX *bboxes, 
 									BOX *tsfmed_bboxes, 
 									const vec3f *tsfmed_vtxs,
@@ -243,34 +228,6 @@ __global__ void preprocess_vtxs_kernel(const vec3f *vtxs,
 
 	const transf *t = transforms;
 	tsfmed_vtxs[i] = t->getVertex(vtxs[i]);
-}
-
-__global__ void collide_kernel(const tri3f *mesh0_tris, const tri3f *mesh1_tris, 
-							   const vec3f *mesh0_vtxs, const vec3f *mesh1_vtxs,
-							   const Bsphere *mesh0_bsphs, const Bsphere *mesh1_bsphs,
-							   const unsigned int mesh0_num_tri, const unsigned int mesh1_num_tri,
-							   bool *face0, bool *face1)
-{
-	int i = blockIdx.x * blockDim.x + threadIdx.x;
-	int j = blockIdx.y * blockDim.y + threadIdx.y;
-	if (i >= mesh0_num_tri || j >= mesh1_num_tri) return;
-	if (!mesh0_bsphs[i].overlaps(mesh1_bsphs[j])) return;
-
-	vec3f p0 = mesh0_vtxs[mesh0_tris[i].id0()];
-	vec3f p1 = mesh0_vtxs[mesh0_tris[i].id1()];
-	vec3f p2 = mesh0_vtxs[mesh0_tris[i].id2()];
-
-	vec3f q0 = mesh1_vtxs[mesh1_tris[j].id0()];
-	vec3f q1 = mesh1_vtxs[mesh1_tris[j].id1()];
-	vec3f q2 = mesh1_vtxs[mesh1_tris[j].id2()];
-
-	// error: collided faces may be set to 0 then
-	// face0[i] = face1[j] = triContact(p0, p1, p2, q0, q1, q2);
-
-	if(triContact(p0, p1, p2, q0, q1, q2)){
-		face0[i] = 1;
-		face1[j] = 1;
-	}
 }
 
 __global__ void collide_kernel(const tri3f *mesh0_tris, const tri3f *mesh1_tris, 
