@@ -254,16 +254,6 @@ __global__ void collide_kernel(const tri3f *mesh0_tris, const tri3f *mesh1_tris,
 	}
 }
 
-static thrust::device_vector<tri3f> d_mesh0_tris;
-static thrust::device_vector<tri3f> d_mesh1_tris;
-static thrust::device_vector<vec3f> d_mesh0_vtxs;
-static thrust::device_vector<vec3f> d_mesh1_vtxs;
-static thrust::device_vector<Bsphere> d_mesh0_bsphs;
-static thrust::device_vector<Bsphere> d_mesh1_bsphs;
-static thrust::device_vector<BOX> d_mesh0_bboxes;
-static thrust::device_vector<BOX> d_mesh1_bboxes;
-
-// for GPU
 void kmesh::collide(const kmesh* other, const transf& trf, const transf &trfOther, thrust::host_vector<int, INT_PINNED>& faces0, thrust::host_vector<int, INT_PINNED>& faces1){
 	// in total: this->_num_tri * other->_num_tri
 	// warp: 32 * 32
@@ -273,14 +263,6 @@ void kmesh::collide(const kmesh* other, const transf& trf, const transf &trfOthe
 	const unsigned int mesh0_num_vtx = this->getNbVertices();
 	const unsigned int mesh1_num_vtx = other->getNbVertices();
 
-	if(d_mesh0_tris.size() == 0 || d_mesh1_tris.size() == 0){
-		d_mesh0_tris = this->getTris();
-		d_mesh1_tris = other->getTris();
-		d_mesh0_vtxs = this->getVtxs();
-		d_mesh1_vtxs = other->getVtxs();
-		d_mesh0_bboxes = this->getBboxes();
-		d_mesh1_bboxes = other->getBboxes();
-	}
 	// custom object should be transferred explicitly to gpu
 	thrust::device_vector<transf> d_transforms(2);
 	d_transforms[0] = trf;
@@ -290,11 +272,11 @@ void kmesh::collide(const kmesh* other, const transf& trf, const transf &trfOthe
 	thrust::device_vector<vec3f> d_mesh0_tsfmed_vtxs(mesh0_num_vtx);
 	thrust::device_vector<vec3f> d_mesh1_tsfmed_vtxs(mesh1_num_vtx);
 	preprocess_vtxs_kernel<<<(mesh0_num_tri + 32 - 1) / 32, 32>>>(
-		thrust::raw_pointer_cast(d_mesh0_vtxs.data()), thrust::raw_pointer_cast(d_mesh0_tsfmed_vtxs.data()),
+		thrust::raw_pointer_cast(this->d_vtxs.data()), thrust::raw_pointer_cast(d_mesh0_tsfmed_vtxs.data()),
 		mesh0_num_vtx, thrust::raw_pointer_cast(d_transforms.data())
 	);
 	preprocess_vtxs_kernel<<<(mesh0_num_tri + 32 - 1) / 32, 32>>>(
-		thrust::raw_pointer_cast(d_mesh1_vtxs.data()), thrust::raw_pointer_cast(d_mesh1_tsfmed_vtxs.data()),
+		thrust::raw_pointer_cast(other->d_vtxs.data()), thrust::raw_pointer_cast(d_mesh1_tsfmed_vtxs.data()),
 		mesh1_num_vtx, thrust::raw_pointer_cast(d_transforms.data()) + 1
 	);
 	cudaDeviceSynchronize();
@@ -306,14 +288,14 @@ void kmesh::collide(const kmesh* other, const transf& trf, const transf &trfOthe
 	thrust::device_vector<BOX> d_mesh1_tsfmed_bboxes(mesh1_num_tri);
 	preprocess_tris_kernel<<<(mesh0_num_tri + 32 - 1) / 32, 32>>>(
 		// thrust::raw_pointer_cast(d_mesh0_bsphs.data()), thrust::raw_pointer_cast(d_mesh0_tsfmed_bsphs.data()),
-		thrust::raw_pointer_cast(d_mesh0_bboxes.data()), thrust::raw_pointer_cast(d_mesh0_tsfmed_bboxes.data()),
-		thrust::raw_pointer_cast(d_mesh0_tsfmed_vtxs.data()), thrust::raw_pointer_cast(d_mesh0_tris.data()),
+		thrust::raw_pointer_cast(this->d_bxs.data()), thrust::raw_pointer_cast(d_mesh0_tsfmed_bboxes.data()),
+		thrust::raw_pointer_cast(d_mesh0_tsfmed_vtxs.data()), thrust::raw_pointer_cast(this->d_tris.data()),
 		mesh0_num_tri, thrust::raw_pointer_cast(d_transforms.data())
 	);
 	preprocess_tris_kernel<<<(mesh1_num_tri + 32 - 1) / 32, 32>>>(
 		// thrust::raw_pointer_cast(d_mesh1_bsphs.data()), thrust::raw_pointer_cast(d_mesh1_tsfmed_bsphs.data()),
-		thrust::raw_pointer_cast(d_mesh1_bboxes.data()), thrust::raw_pointer_cast(d_mesh1_tsfmed_bboxes.data()),
-		thrust::raw_pointer_cast(d_mesh1_tsfmed_vtxs.data()), thrust::raw_pointer_cast(d_mesh1_tris.data()),
+		thrust::raw_pointer_cast(other->d_bxs.data()), thrust::raw_pointer_cast(d_mesh1_tsfmed_bboxes.data()),
+		thrust::raw_pointer_cast(d_mesh1_tsfmed_vtxs.data()), thrust::raw_pointer_cast(other->d_tris.data()),
 		mesh1_num_tri, thrust::raw_pointer_cast(d_transforms.data()) + 1
 	);
 	cudaDeviceSynchronize();
@@ -329,7 +311,7 @@ void kmesh::collide(const kmesh* other, const transf& trf, const transf &trfOthe
 	thrust::device_vector<bool> d_face1(mesh1_num_tri, 0);
 
 	collide_kernel<<<grid_size, block_size>>>(
-		thrust::raw_pointer_cast(d_mesh0_tris.data()), thrust::raw_pointer_cast(d_mesh1_tris.data()), 
+		thrust::raw_pointer_cast(this->d_tris.data()), thrust::raw_pointer_cast(other->d_tris.data()), 
 		thrust::raw_pointer_cast(d_mesh0_tsfmed_vtxs.data()), thrust::raw_pointer_cast(d_mesh1_tsfmed_vtxs.data()), 
 		thrust::raw_pointer_cast(d_mesh0_tsfmed_bboxes.data()), thrust::raw_pointer_cast(d_mesh1_tsfmed_bboxes.data()),
 		mesh0_num_tri, mesh1_num_tri, 

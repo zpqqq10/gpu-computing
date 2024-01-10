@@ -15,6 +15,7 @@ success:
 7. sphere相交计算中把速度较慢的sqrt等效替换掉了，加速: ~0.075 s
 
 8. 用aabb替代bounding sphere，估计是距离的计算比较耗时而且球形不如立方体贴合三角形面片: ~0.034 s
+所有的源文件都要以cu结尾，不然nvcc可能会以gcc编译头文件，导致头文件的对象不能有device_vector成员
 
 
 fail:

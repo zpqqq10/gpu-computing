@@ -30,6 +30,7 @@
 #include <stdio.h>
 #include <cuda_runtime.h>
 #include <thrust/host_vector.h>
+#include <thrust/device_vector.h>
 #include <thrust/transform.h>
 #include <thrust/mr/allocator.h>
 #include <thrust/system/cuda/memory.h> // thrust::system::cuda::universal_host_pinned_memory_resource;
@@ -44,6 +45,8 @@
 #include "tri3f.cuh"
 #include "aabb.cuh"
 #include "pair.h"
+#include "morton.cuh"
+#include "bvh.cuh"
 
 #include <set>
 #include <vector>
@@ -61,9 +64,14 @@ public:
 	thrust::host_vector<tri3f> _tris;			// array of triangles
 	thrust::host_vector<vec3f> _vtxs;			// array of vertices
 	thrust::host_vector<Bsphere> _bsphs;		// array of bounding spheres
+	thrust::host_vector<BVHNode> _leaves_bvh;			// leaves of BVH
+	thrust::host_vector<BVHNode> _inters_bvh;			// internals of BVH
 
-	// thrust::host_vector<vec3f> _fnrms;			// array of face normals
-	// thrust::host_vector<vec3f> _nrms;			// array of vertex normals
+	// cannot define device vector in header
+	thrust::device_vector<tri3f> d_tris;			// array of triangles
+	thrust::device_vector<vec3f> d_vtxs;
+	thrust::device_vector<BOX> d_bxs;
+
 	thrust::host_vector<BOX> _bxs;				// bboxes of each triangles
 	vec3f *_fnrms;			// array of face normals
 	vec3f *_nrms;			// array of vertex normals
@@ -71,42 +79,8 @@ public:
 	int _dl;				// display list
 
 public:
-	kmesh(unsigned int numVtx, unsigned int numTri, tri3f* tris, vec3f* vtxs, bool cyl): _tris(tris, tris + numTri), _vtxs(vtxs, vtxs + numVtx) {
-		_num_vtx = numVtx;
-		_num_tri = numTri;
-
-		// for(unsigned int i = 0; i < numTri; i++) {
-		// 	tri3f &a = _tris[i];
-		// 	vec3f &p0 = _vtxs[a.id0()];
-		// 	vec3f &p1 = _vtxs[a.id1()];
-		// 	vec3f &p2 = _vtxs[a.id2()];
-
-		// 	a.setCenter((p0 + p1 + p2) / 3.0f);
-		// }
-
-		// bounding sphere is slower than aabb, abandoned
-		// _bsphs.resize(numTri);
-		// for (unsigned int i = 0; i < numTri; i++) {
-		// 	tri3f &a = _tris[i];
-		// 	vec3f p0 = _vtxs[a.id0()];
-		// 	vec3f p1 = _vtxs[a.id1()];
-		// 	vec3f p2 = _vtxs[a.id2()];
-
-		// 	_bsphs[i].init_min(p0, p1, p2);
-		// }
-
-		_fnrms = nullptr;
-		_nrms = nullptr;
-		// _bxs = nullptr;
-		_dl = -1;
-
-		updateNrms();
-		updateBxs();
-		updateDL(cyl, -1);
-	}
-
+	kmesh(unsigned int numVtx, unsigned int numTri, tri3f* tris, vec3f* vtxs, bool cyl);
 	~kmesh() {
-
 		if (_fnrms != nullptr)
 			delete[] _fnrms;
 		if (_nrms != nullptr)
@@ -114,8 +88,6 @@ public:
 		
 		destroyDL();
 	}
-
-
 	unsigned int getNbVertices() const { return _num_vtx; }
 	unsigned int getNbFaces() const { return _num_tri; }
 	// vec3f *getVtxs() const { return _vtxs; }
@@ -127,6 +99,7 @@ public:
 	vec3f* getNrms() const { return _nrms; }
 	vec3f* getFNrms() const { return _fnrms; }
 
+	void updateBxs();
 	// calc norms, and prepare for display ...
 	void updateNrms();
 
@@ -150,28 +123,6 @@ public:
 		v0 = _vtxs[f.id0()];
 		v1 = _vtxs[f.id1()];
 		v2 = _vtxs[f.id2()];
-	}
-
-	void updateBxs() {
-		if (_bxs.size() == 0){
-			_bxs.resize(_num_tri);
-			// _bxs = new aabb[_num_tri];
-		}
-
-		_bx.init();
-
-		for (unsigned int i = 0; i < _num_tri; i++) {
-			tri3f &a = _tris[i];
-			vec3f p0 = _vtxs[a.id0()];
-			vec3f p1 = _vtxs[a.id1()];
-			vec3f p2 = _vtxs[a.id2()];
-
-			BOX bx(p0, p1);
-			bx += p2;
-			_bxs[i] = bx;
-
-			_bx += bx;
-		}
 	}
 
 	BOX bound() {

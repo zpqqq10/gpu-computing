@@ -26,9 +26,10 @@ include_directories(inc)
 
 # 添加源文件
 file(GLOB SOURCES
-    src/cmodel.cpp
+    src/cmodel.cu
+    src/bvh.cu
     src/collid.cu
-    src/crigid.cpp
+    src/crigid.cu
     src/obj-viewer.cu)
 
 # 添加头文件
@@ -66,4 +67,4 @@ link_directories(lib)
 target_link_libraries(${TARGET_NAME} glut GL GLU OpenMP::OpenMP_CXX)
 
 # target_link_libraries(${GPU_TARGET_NAME} PRIVATE GL GLU glut GLEW)
-# nvcc -o main src/cmodel.cpp src/collid.cu src/crigid.cpp src/obj-viewer.cu -Iinc -Llib -lglut -lGL -lGLU -Xcompiler "-fopenmp" -std=c++11
+# nvcc -o main src/cmodel.cu src/collid.cu src/crigid.cu src/obj-viewer.cu src/bvh.cu -Iinc -Llib -lglut -lGL -lGLU -Xcompiler "-fopenmp" -std=c++11

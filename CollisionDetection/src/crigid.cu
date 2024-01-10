@@ -35,9 +35,14 @@
 #include <string.h>
 #include <thrust/device_vector.h>
 #include <thrust/host_vector.h>
+#include <thrust/sort.h>
+#include <thrust/sequence.h>
+#include <thrust/gather.h>
 
+#include "morton.cuh"
 #include "crigid.cuh"
 #include "aabb.cuh"
+#include "helper_cuda.h"
 
 #include <set>
 using namespace std;
@@ -72,6 +77,52 @@ update(tri3f &tri, thrust::host_vector<vec3f>& vtxs)
 	return update(v1, v2, v3);
 }
 
+kmesh::kmesh(unsigned int numVtx, unsigned int numTri, tri3f* tris, vec3f* vtxs, bool cyl)
+: _tris(tris, tris + numTri), _vtxs(vtxs, vtxs + numVtx)
+{
+		_num_vtx = numVtx;
+		_num_tri = numTri;
+
+		_fnrms = nullptr;
+		_nrms = nullptr;
+		_dl = -1;
+
+		updateBxs();
+		// calculate mortons 
+		thrust::device_vector<morton> d_mortons(numTri);
+		thrust::device_vector<BOX> d_bbox(1);
+		d_bbox[0] = _bx;
+		d_tris = _tris;
+		d_vtxs = _vtxs;
+		calculate_morton_kernel<<<(numTri + 32 - 1) / 32, 32>>>(
+			thrust::raw_pointer_cast(d_mortons.data()),
+			thrust::raw_pointer_cast(d_tris.data()),
+			thrust::raw_pointer_cast(d_vtxs.data()),
+			thrust::raw_pointer_cast(d_bbox.data()),
+			numTri);
+		cudaDeviceSynchronize();
+		getLastCudaError("calculate mortons failed");
+
+		// sort triangles and bboxes
+		thrust::device_vector<int> sorted_indices(numTri);
+		d_bxs = _bxs;
+		thrust::device_vector<BOX> d_bxs_sorted(numTri);
+		thrust::device_vector<tri3f> d_tris_sorted(numTri);
+		// multiple argsort needed here, thus sorting an index vector at first
+    	thrust::sequence(sorted_indices.begin(), sorted_indices.end());
+		thrust::sort_by_key(d_mortons.begin(), d_mortons.end(), sorted_indices.begin());
+		thrust::gather(sorted_indices.begin(), sorted_indices.end(), d_tris.begin(), d_tris_sorted.begin());
+		thrust::gather(sorted_indices.begin(), sorted_indices.end(), d_bxs.begin(), d_bxs_sorted.begin());
+		getLastCudaError("sort mortons and triangles and bboxes failed");
+		d_tris = d_tris_sorted;
+		d_bxs = d_bxs_sorted;
+		_tris = d_tris_sorted;
+		_bxs = d_bxs_sorted;
+
+		updateNrms();
+		updateDL(cyl, -1);
+	}
+
 void kmesh::updateNrms()
 {
 	if (_fnrms == nullptr)
@@ -99,6 +150,28 @@ void kmesh::updateNrms()
 	for (unsigned int i=0; i<_num_vtx; i++)
 		_nrms[i].normalize();
 }
+
+void kmesh::updateBxs() {
+		if (_bxs.size() == 0){
+			_bxs.resize(_num_tri);
+			// _bxs = new aabb[_num_tri];
+		}
+
+		_bx.init();
+
+		for (unsigned int i = 0; i < _num_tri; i++) {
+			tri3f &a = _tris[i];
+			vec3f p0 = _vtxs[a.id0()];
+			vec3f p1 = _vtxs[a.id1()];
+			vec3f p2 = _vtxs[a.id2()];
+
+			BOX bx(p0, p1);
+			bx += p2;
+			_bxs[i] = bx;
+
+			_bx += bx;
+		}
+	}
 
 void kmesh::display(bool cyl, int level)
 {

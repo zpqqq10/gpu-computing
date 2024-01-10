@@ -4,7 +4,7 @@
 #include "definitions.h"
 #include "aabb.cuh"
 #include "tri3f.cuh"
-
+#include <cmath>
 
 __device__ __host__ FORCEINLINE morton expandBits(morton v)
 {
@@ -37,13 +37,13 @@ __device__ __host__ FORCEINLINE morton morton3D(REAL x, REAL y, REAL z)
 {     
 
 #ifdef MORTON_CODE_64
-    x = min(max(x * 1048576.0f, 0.0f), 1048575.0f);
-    y = min(max(y * 1048576.0f, 0.0f), 1048575.0f);
-    z = min(max(z * 1048576.0f, 0.0f), 1048575.0f);
+    x = min(max(x * 1048576.0f, (REAL)0.0f), (REAL)1048575.0f);
+    y = min(max(y * 1048576.0f, (REAL)0.0f), (REAL)1048575.0f);
+    z = min(max(z * 1048576.0f, (REAL)0.0f), (REAL)1048575.0f);
 #else
-    x = min(max(x * 1024.0f, 0.0f), 1023.0f);
-    y = min(max(y * 1024.0f, 0.0f), 1023.0f);
-    z = min(max(z * 1024.0f, 0.0f), 1023.0f);
+    x = min(max(x * 1024.0f, (REAL)0.0f), (REAL)1023.0f);
+    y = min(max(y * 1024.0f, (REAL)0.0f), (REAL)1023.0f);
+    z = min(max(z * 1024.0f, (REAL)0.0f), (REAL)1023.0f);
 #endif
 
     morton xx = expandBits((morton)x);
@@ -56,21 +56,9 @@ __device__ __host__ FORCEINLINE morton morton3D(REAL x, REAL y, REAL z)
 
 // calculating moton code
 __global__ void calculate_morton_kernel(
-                            tri3f *triangles, 
-                            const BOX &bbox, 
-                            unsigned int num_tris)
-{
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-	if (i >= num_tris) return;
-    /*
-    norm the centriod into [0,1]
-    calculate the morton code 
-    */ 
-    double norm_cx = Norm(triangles[i]._center.x, bbox._min.x, bbox._max.x);
-    double norm_cy = Norm(triangles[i]._center.y, bbox._min.y, bbox._max.y);
-    double norm_cz = Norm(triangles[i]._center.z, bbox._min.z, bbox._max.z);
-
-    triangles[i].morton = morton3D(norm_cx, norm_cy, norm_cz);
-    
-}
+                            morton *mortons,
+                            const tri3f *triangles, 
+                            const vec3f *vertices,
+                            const BOX *bbox,
+                            unsigned int num_tris);
 

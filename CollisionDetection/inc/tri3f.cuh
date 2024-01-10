@@ -34,9 +34,8 @@
 // triangle, storing three vertex indices
 class tri3f {
 public:
-	// vec2f _what;
 	unsigned int _ids[3];
-	// morton _morton;
+	//  kmesh::displayStatic set the size of tri3f
 
 	__device__ __host__ FORCEINLINE tri3f() {
 		// become the largest unsigned int
@@ -53,18 +52,6 @@ public:
 		_ids[2] = id2;
 	}
 
-	// __device__ __host__ FORCEINLINE void setCenter(const REAL cx, const REAL cy, const REAL cz) {
-	// 	_centroid.x = cx;
-	// 	_centroid.y = cy;
-	// 	_centroid.z = cz;
-	// }
-
-	// __device__ __host__ FORCEINLINE void setCenter(const vec3f &center) {
-	// 	_centroid.x = center.x;
-	// 	_centroid.y = center.y;
-	// 	_centroid.z = center.z;
-	// }
-
 	__device__ __host__ FORCEINLINE unsigned int id(int i) { return _ids[i]; }
 	__device__ __host__ FORCEINLINE unsigned int id0() {return _ids[0];}
 	__device__ __host__ FORCEINLINE unsigned int id1() {return _ids[1];}
@@ -74,10 +61,6 @@ public:
 	__device__ __host__ FORCEINLINE unsigned int id2() const {return _ids[2];}
 	// std::swap is not suppotred in device
 	FORCEINLINE void reverse() {std::swap(_ids[0], _ids[2]);}
-
-	// __host__ __device__ bool operator<(const tri3f& t) const {
-    //     return _morton < t._morton;
-    // }
 };
 
 inline std::ostream& operator<<( std::ostream&os, const tri3f &tri ) {
