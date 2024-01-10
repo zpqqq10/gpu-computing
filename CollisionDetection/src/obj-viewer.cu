@@ -33,7 +33,7 @@
 #include <GL/glh_glut.h>
 #include <omp.h>
 #include <stdio.h>
-#include "forceline.h"
+#include "definitions.h"
 
 //****************************** add for linux ******************************//
 #include <time.h>

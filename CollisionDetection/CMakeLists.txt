@@ -35,16 +35,17 @@ file(GLOB SOURCES
 file(GLOB HEADERS
     # inc/GL
 
-    inc/forceline.h
+    inc/definitions.h
     inc/pair.h
-    inc/real.h
 
     inc/vec3f.cuh
     inc/quaternion.cuh
     inc/mat3f.cuh
     inc/transf.cuh
 
-    inc/aaabb.cuh
+    inc/aabb.cuh
+    # inc/morton.cuh
+    # inc/bvh.cuh
 
     inc/tri3f.cuh
     inc/crigid.cuh

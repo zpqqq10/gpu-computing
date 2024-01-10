@@ -164,7 +164,7 @@ public:
 	//! Apply a transform to an AABB
 	__device__ __host__ FORCEINLINE void applyTransform(const transf &trans)
 	{
-		vec3f c =center();
+		vec3f c = center();
 		vec3f extends = _max - c;
 		// Compute new center
 		c = trans(c);

@@ -29,7 +29,7 @@
 
 #include <math.h>
 
-#include "forceline.h"
+#include "definitions.h"
 #include "vec3f.cuh"
 #include "quaternion.cuh"
 

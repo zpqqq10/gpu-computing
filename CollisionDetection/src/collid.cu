@@ -208,12 +208,8 @@ __global__ void preprocess_tris_kernel(const BOX *bboxes,
 	if (i >= num_tris) return;
 
 	// const transf *t = transforms;
-	vec3f p0 = tsfmed_vtxs[tris[i].id0()];
-	vec3f p1 = tsfmed_vtxs[tris[i].id1()];
-	vec3f p2 = tsfmed_vtxs[tris[i].id2()];
-	BOX bx(p0, p1);
-	bx += p2;
-	tsfmed_bboxes[i] = bx;
+	tsfmed_bboxes[i] = bboxes[i];
+	tsfmed_bboxes[i].applyTransform(*transforms);
 }
 
 // preprocess those related to vertices

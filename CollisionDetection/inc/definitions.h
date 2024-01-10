@@ -27,6 +27,25 @@
 
 #pragma once
 
+//****************************** add for linux ******************************//
+// #define _MSC_VER 1800
+#define __forceinline inline
+//****************************** add for linux ******************************//
+
+#ifndef FORCEINLINE
+#if (_MSC_VER >= 1200)
+#define FORCEINLINE __forceinline
+#else
+#define FORCEINLINE inline
+#endif
+#endif
+
+#define USE_GPU
+
+#define MORTON_CODE_64
+typedef unsigned long long morton;
+
+// REAL
 #define USE_DOUBLE
 
 #ifdef USE_DOUBLE

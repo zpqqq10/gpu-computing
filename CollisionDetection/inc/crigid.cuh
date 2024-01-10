@@ -75,6 +75,15 @@ public:
 		_num_vtx = numVtx;
 		_num_tri = numTri;
 
+		// for(unsigned int i = 0; i < numTri; i++) {
+		// 	tri3f &a = _tris[i];
+		// 	vec3f &p0 = _vtxs[a.id0()];
+		// 	vec3f &p1 = _vtxs[a.id1()];
+		// 	vec3f &p2 = _vtxs[a.id2()];
+
+		// 	a.setCenter((p0 + p1 + p2) / 3.0f);
+		// }
+
 		// bounding sphere is slower than aabb, abandoned
 		// _bsphs.resize(numTri);
 		// for (unsigned int i = 0; i < numTri; i++) {

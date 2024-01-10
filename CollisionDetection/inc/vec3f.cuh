@@ -30,8 +30,7 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 #include <ostream>
-#include "forceline.h"
-#include "real.h"
+#include "definitions.h"
 #include <cuda_runtime.h>
 
 #define     GLH_ZERO                REAL(0.0)
@@ -88,6 +87,59 @@ __device__ __host__ inline bool isEqual( REAL a, REAL b, REAL tol=GLH_EPSILON )
 #endif
 
 #include <assert.h>
+
+class vec2i {
+public:
+	union {
+		struct {
+		int x, y;
+		};
+		struct {
+		int v[2];
+		};
+	};
+
+	__device__ __host__ FORCEINLINE vec2i ()
+	{x=0; y=0;}
+
+	__device__ __host__ FORCEINLINE vec2i(const vec2i &v)
+	{
+		x = v.x;
+		y = v.y;
+	}
+
+	__device__ __host__ FORCEINLINE vec2i(const int *v)
+	{
+		x = v[0];
+		y = v[1];
+	}
+
+	__device__ __host__ FORCEINLINE vec2i(int x, int y)
+	{
+		this->x = x;
+		this->y = y;
+	}
+
+	// cross product
+	__device__ __host__ FORCEINLINE int cross(const vec2i &vec) const
+	{
+		return x*vec.y - y*vec.x;
+	}
+
+	__device__ __host__ FORCEINLINE int dot(const vec2i &vec) const {
+		return x*vec.x + y*vec.y;
+	}
+
+	__device__ __host__ FORCEINLINE int operator [] ( int i ) const {return v[i];}
+	__device__ __host__ FORCEINLINE int &operator [] (int i) { return v[i]; }
+
+	__device__ __host__ FORCEINLINE vec2i operator- (const vec2i &v) const
+	{
+		return vec2i(x - v.x, y - v.y);
+	}
+
+	
+};
 
 class vec2f {
 public:

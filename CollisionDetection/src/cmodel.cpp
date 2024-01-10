@@ -300,6 +300,7 @@ void initModel(const char* c1file, const char* c2file)
 	crigid* rigA = putMesh(kmA, vec3f(), vec3f());
 	g_box += rigA->bound();
 
+	// translate one bunny
 	crigid* rigB = putMesh(kmB, vec3f(-1.25, 0, 0), vec3f());
 	g_box += rigB->bound();
 

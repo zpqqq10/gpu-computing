@@ -27,7 +27,7 @@
 
 #pragma once
 
-#include "forceline.h"
+#include "definitions.h"
 #include "vec3f.cuh"
 #include <cuda_runtime.h>
 
