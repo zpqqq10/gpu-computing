@@ -381,7 +381,8 @@ __global__ void BVH_kernel(
 	BOX *query_box = &mesh0_leaves[i].box;
 
 	BVHNode* stack[32];
-	unsigned int sptr = 0;		// stack pointer, always point to top of the stack (one position ahead)
+	// stack pointer
+	unsigned int sptr = 0;
 	stack[sptr++] = NULL;
 	BVHNode* current = mesh1_root;
 
@@ -389,11 +390,11 @@ __global__ void BVH_kernel(
 		BVHNode* left  = current->left;
 		BVHNode* right = current->right;
 
-		// Check box overlap as indicator of triangle contact
+		// check box overlaps
 		bool overlapL = query_box->overlaps(left->box); 
 		bool overlapR = query_box->overlaps(right->box);
 
-		// Check leaf side child if overlapped
+		// overlaps with left child
 		if (overlapL) {
 			if (left->isLeaf) {
 					if (check_tri(query_tri, left->tri, mesh0_vtxs, mesh1_vtxs)) {
@@ -407,7 +408,7 @@ __global__ void BVH_kernel(
 			}
 		}
 
-		// Check right side child if overlapped
+		// overlaps with right child
 		if (overlapR) {
 			if (right->isLeaf) {
 					if (check_tri(query_tri, right->tri, mesh0_vtxs, mesh1_vtxs)) {
@@ -421,7 +422,6 @@ __global__ void BVH_kernel(
 			}
 		}
 
-		// Pop out whatever
 		current = stack[--sptr];
 	}
 	
@@ -441,6 +441,7 @@ __global__ void preprocess_tris_kernel(
 	// transform is relative to the original pose
 	leaves[i].box = leaves[i].obox;
 	leaves[i].box.applyTransform(*transforms);
+	// internals are of size num_tris - 1
 	if (i == num_tris - 1) return;
 	inters[i].box = inters[i].obox;
 	inters[i].box.applyTransform(*transforms);
