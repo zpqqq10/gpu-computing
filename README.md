@@ -32,5 +32,5 @@ cmake .. && make
 cd CollisionDetection
 mkdir build && cd build
 cmake .. && make
-./main
+./main ../data/my-bunny.obj ../data/my-bunny.obj
 ```
