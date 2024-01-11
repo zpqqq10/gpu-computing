@@ -439,6 +439,11 @@ int main(int argc, char **argv) {
 #else
   printf("Using CPU.\n");
 #endif
+#ifdef USE_BVH
+  printf("Using BVH.\n");
+#else
+  printf("Using AABB.\n");
+#endif
 
   usage_self_cd();
 

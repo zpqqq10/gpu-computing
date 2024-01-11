@@ -39,7 +39,7 @@
 #include <thrust/sequence.h>
 #include <thrust/gather.h>
 
-#include "morton.cuh"
+#include "bvh.cuh"
 #include "crigid.cuh"
 #include "aabb.cuh"
 #include "helper_cuda.h"
@@ -80,48 +80,89 @@ update(tri3f &tri, thrust::host_vector<vec3f>& vtxs)
 kmesh::kmesh(unsigned int numVtx, unsigned int numTri, tri3f* tris, vec3f* vtxs, bool cyl)
 : _tris(tris, tris + numTri), _vtxs(vtxs, vtxs + numVtx)
 {
-		_num_vtx = numVtx;
-		_num_tri = numTri;
+	cudaEvent_t start, stop;
+	float elapsedTime;
+	cudaEventCreate(&start);
+	cudaEventCreate(&stop);
+	getLastCudaError("timing failed");
+	_num_vtx = numVtx;
+	_num_tri = numTri;
 
-		_fnrms = nullptr;
-		_nrms = nullptr;
-		_dl = -1;
+	_fnrms = nullptr;
+	_nrms = nullptr;
+	_dl = -1;
 
-		updateBxs();
-		// calculate mortons 
-		thrust::device_vector<morton> d_mortons(numTri);
-		thrust::device_vector<BOX> d_bbox(1);
-		d_bbox[0] = _bx;
-		d_tris = _tris;
-		d_vtxs = _vtxs;
-		calculate_morton_kernel<<<(numTri + 32 - 1) / 32, 32>>>(
-			thrust::raw_pointer_cast(d_mortons.data()),
-			thrust::raw_pointer_cast(d_tris.data()),
-			thrust::raw_pointer_cast(d_vtxs.data()),
-			thrust::raw_pointer_cast(d_bbox.data()),
-			numTri);
-		cudaDeviceSynchronize();
-		getLastCudaError("calculate mortons failed");
+	updateBxs();
+	// calculate mortons 
+	cudaEventRecord(start, 0);
+	thrust::device_vector<morton> d_mortons(numTri);
+	thrust::device_vector<BOX> d_bbox(1);
+	d_bbox[0] = _bx;
+	d_tris = _tris;
+	d_vtxs = _vtxs;
+	calculate_morton_kernel<<<(numTri + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(
+		thrust::raw_pointer_cast(d_mortons.data()),
+		thrust::raw_pointer_cast(d_tris.data()),
+		thrust::raw_pointer_cast(d_vtxs.data()),
+		thrust::raw_pointer_cast(d_bbox.data()),
+		numTri);
+	cudaDeviceSynchronize();
+	getLastCudaError("calculate mortons failed");
 
-		// sort triangles and bboxes
-		thrust::device_vector<int> sorted_indices(numTri);
-		d_bxs = _bxs;
-		thrust::device_vector<BOX> d_bxs_sorted(numTri);
-		thrust::device_vector<tri3f> d_tris_sorted(numTri);
-		// multiple argsort needed here, thus sorting an index vector at first
-    	thrust::sequence(sorted_indices.begin(), sorted_indices.end());
-		thrust::sort_by_key(d_mortons.begin(), d_mortons.end(), sorted_indices.begin());
-		thrust::gather(sorted_indices.begin(), sorted_indices.end(), d_tris.begin(), d_tris_sorted.begin());
-		thrust::gather(sorted_indices.begin(), sorted_indices.end(), d_bxs.begin(), d_bxs_sorted.begin());
-		getLastCudaError("sort mortons and triangles and bboxes failed");
-		d_tris = d_tris_sorted;
-		d_bxs = d_bxs_sorted;
-		_tris = d_tris_sorted;
-		_bxs = d_bxs_sorted;
+	// sort triangles and bboxes
+	thrust::device_vector<int> sorted_indices(numTri);
+	d_bxs = _bxs;
+	thrust::device_vector<BOX> d_bxs_sorted(numTri);
+	thrust::device_vector<tri3f> d_tris_sorted(numTri);
+	// multiple argsort needed here, thus sorting an index vector at first
+	thrust::sequence(sorted_indices.begin(), sorted_indices.end());
+	thrust::sort_by_key(d_mortons.begin(), d_mortons.end(), sorted_indices.begin());
+	thrust::gather(sorted_indices.begin(), sorted_indices.end(), d_tris.begin(), d_tris_sorted.begin());
+	thrust::gather(sorted_indices.begin(), sorted_indices.end(), d_bxs.begin(), d_bxs_sorted.begin());
+	getLastCudaError("sort mortons and triangles and bboxes failed");
+	d_tris = d_tris_sorted;
+	d_bxs = d_bxs_sorted;
+	_tris = d_tris_sorted;
+	_bxs = d_bxs_sorted;
 
-		updateNrms();
-		updateDL(cyl, -1);
-	}
+	// init bvh nodes
+	d_leaves_bvh.resize(numTri);
+	d_inters_bvh.resize(numTri - 1);
+	init_bvhleaves_kernel<<<(numTri + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(
+		thrust::raw_pointer_cast(d_leaves_bvh.data()),
+		thrust::raw_pointer_cast(d_tris.data()),
+		numTri
+	);
+	cudaDeviceSynchronize();
+	getLastCudaError("init bvh nodes failed");
+
+	// build bvh
+	build_bvh_kernel<<<(numTri + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(
+		thrust::raw_pointer_cast(d_mortons.data()),
+		thrust::raw_pointer_cast(d_leaves_bvh.data()),
+		thrust::raw_pointer_cast(d_inters_bvh.data()),
+		numTri - 1
+	);
+	cudaDeviceSynchronize();
+	getLastCudaError("build bvh failed");
+
+	// calculated bbox bottom-up
+	cal_bboxes_kernel<<<(numTri + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(
+		thrust::raw_pointer_cast(d_leaves_bvh.data()),
+		thrust::raw_pointer_cast(d_bxs.data()),
+		numTri);
+	cudaDeviceSynchronize();
+	getLastCudaError("cal bbox failed");
+
+	cudaEventRecord(stop, 0);
+	cudaEventSynchronize(stop);
+	cudaEventElapsedTime(&elapsedTime, start, stop);
+	getLastCudaError("timing failed");
+	std::cout << "elapsed time: " << elapsedTime << "ms" << std::endl;
+
+	updateNrms();
+	updateDL(cyl, -1);
+}
 
 void kmesh::updateNrms()
 {
@@ -242,8 +283,11 @@ void crigid::checkCollision(crigid *rb, thrust::host_vector<int, INT_PINNED>&fac
 	const transf& trfA = ra->getTrf();
 	const transf& trfB = rb->getTrf();
 	//const transf trfA2B = trfB.inverse() * trfA;
-
+#ifdef USE_BVH
+	ra->getMesh()->collide_bvh(rb->getMesh(), trfA, trfB, face0, face1);
+#else
 	ra->getMesh()->collide(rb->getMesh(), trfA, trfB, face0, face1);
+#endif
 }
 
 

@@ -1,4 +1,5 @@
 // for testing pinned memory performance, 2 ways to use pinned memory
+// a demo
 // nvcc -o main src/pinned.cu && ./main
 // https://github.com/ledatelescope/bifrost/blob/3c68028ebd55651522c4de3862d5979c16b209e5/src/fft.cu
 // Regular host_vector sorting time: 0.00257205 seconds

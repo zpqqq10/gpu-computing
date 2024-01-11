@@ -1,44 +1,48 @@
 #pragma once
 
 #include <cuda_runtime.h>
-#include "morton.cuh"
+#include "definitions.h"
+#include "aabb.cuh"
 #include "tri3f.cuh"
 #include "vec3f.cuh"
-#include "vector_functions.h"
 
 class BVHNode {
 public:
     unsigned int idx;               // index of node
+    unsigned int calculated = 0;       // whether the bbox has been calculated
 
     bool isLeaf;                    // if leaf node
 	BVHNode *parent;                // parent node
     BVHNode *left, *right;          // left/right child node, only internal nodes have
-    BOX box;                        // AABB bounding box
-    // index? pointer?
-    tri3f *triangle;             // corresponding triangle, only leaf nodes have
+    BOX box;                        // bounding box
+    BOX obox;                       // original bounding box, to be used with transform
+    tri3f *tri;                    // triangles in the leaf node, only leaf nodes have
 
     __host__ __device__ BVHNode() { 
         parent = NULL; 
         left = right = NULL;
-        triangle = NULL;
+        isLeaf = false;
+        tri = NULL;
     }
 };
 
-
-/*find the split index*/
-__device__ int findSplit(morton* mortons,
-                        const unsigned int first,
-                        const unsigned int last);
-
-
-/*find the range of objects in the internal node*/
-__device__ vec2i determineRange(morton* mortons,
-                                const unsigned int num_tris, // originally numObjects, a triangle is exactly an object here
-                                const unsigned int i);
-
-/*generate a BVH tree by iteration*/
+// generate a BVH tree
 __global__ void build_bvh_kernel(
                                 morton* mortons,
                                 BVHNode *LeafNodes, 
                                 BVHNode *InternalNodes,
                                 const unsigned int num_tris);
+
+// init leaf nodes or internal nodes
+__global__ void init_bvhleaves_kernel(BVHNode* nodes, tri3f *tris, const unsigned int num_tris);
+
+// calculate bboxes bottom-up
+__global__ void cal_bboxes_kernel(BVHNode* leaves, BOX* leaf_bboxes, unsigned int num_tris);
+
+// calculating moton code
+__global__ void calculate_morton_kernel(
+                            morton *mortons,
+                            const tri3f *triangles, 
+                            const vec3f *vertices,
+                            const BOX *bbox,
+                            unsigned int num_tris);

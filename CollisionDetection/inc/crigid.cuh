@@ -45,7 +45,6 @@
 #include "tri3f.cuh"
 #include "aabb.cuh"
 #include "pair.h"
-#include "morton.cuh"
 #include "bvh.cuh"
 
 #include <set>
@@ -64,13 +63,13 @@ public:
 	thrust::host_vector<tri3f> _tris;			// array of triangles
 	thrust::host_vector<vec3f> _vtxs;			// array of vertices
 	thrust::host_vector<Bsphere> _bsphs;		// array of bounding spheres
-	thrust::host_vector<BVHNode> _leaves_bvh;			// leaves of BVH
-	thrust::host_vector<BVHNode> _inters_bvh;			// internals of BVH
 
 	// cannot define device vector in header
 	thrust::device_vector<tri3f> d_tris;			// array of triangles
 	thrust::device_vector<vec3f> d_vtxs;
 	thrust::device_vector<BOX> d_bxs;
+	thrust::device_vector<BVHNode> d_leaves_bvh;
+	thrust::device_vector<BVHNode> d_inters_bvh;
 
 	thrust::host_vector<BOX> _bxs;				// bboxes of each triangles
 	vec3f *_fnrms;			// array of face normals
@@ -115,7 +114,7 @@ public:
 
 	void collide(const kmesh* other, const transf& trf, const transf &trfOther, std::vector<id_pair>& rets);
 	void collide(const kmesh* other, const transf& trf, const transf &trfOther, thrust::host_vector<int, INT_PINNED>& faces0, thrust::host_vector<int, INT_PINNED>& faces1);
-
+	void collide_bvh(kmesh* other, const transf& trf, const transf &trfOther, thrust::host_vector<int, INT_PINNED>& faces0, thrust::host_vector<int, INT_PINNED>& faces1);
 
 	void getTriangleVtxs(int fid, vec3f& v0, vec3f& v1, vec3f& v2) const
 	{

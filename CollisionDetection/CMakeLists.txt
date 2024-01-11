@@ -6,10 +6,7 @@ find_package(OpenGL REQUIRED)
 find_package(GLUT REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(OpenMP REQUIRED)
-# find_package(Thrust REQUIRED)
-# thrust_create_target(Thrust)
 
-# find_package(CUDA REQUIRED)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(CMAKE_BUILD_TYPE "Release")
@@ -45,8 +42,7 @@ file(GLOB HEADERS
     inc/transf.cuh
 
     inc/aabb.cuh
-    # inc/morton.cuh
-    # inc/bvh.cuh
+    inc/bvh.cuh
 
     inc/tri3f.cuh
     inc/crigid.cuh

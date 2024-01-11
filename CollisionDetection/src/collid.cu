@@ -198,8 +198,6 @@ void kmesh::collide(const kmesh* other, const transf& t0, const transf &t1, std:
 // preprocess those related to triangles
 __global__ void preprocess_tris_kernel(const BOX *bboxes, 
 									BOX *tsfmed_bboxes, 
-									const vec3f *tsfmed_vtxs,
-									const tri3f *tris, 
 									const unsigned int num_tris,
 									const transf *transforms
 									)
@@ -254,10 +252,11 @@ __global__ void collide_kernel(const tri3f *mesh0_tris, const tri3f *mesh1_tris,
 	}
 }
 
+// not using bvh
 void kmesh::collide(const kmesh* other, const transf& trf, const transf &trfOther, thrust::host_vector<int, INT_PINNED>& faces0, thrust::host_vector<int, INT_PINNED>& faces1){
 	// in total: this->_num_tri * other->_num_tri
 	// warp: 32 * 32
-	// in face a combination of cartesian product
+	// in fact a combination of cartesian product
 	const unsigned int mesh0_num_tri = this->getNbFaces();
 	const unsigned int mesh1_num_tri = other->getNbFaces();
 	const unsigned int mesh0_num_vtx = this->getNbVertices();
@@ -268,14 +267,14 @@ void kmesh::collide(const kmesh* other, const transf& trf, const transf &trfOthe
 	d_transforms[0] = trf;
 	d_transforms[1] = trfOther;
 
-	// preprocess those related to triangles
+	// preprocess those related to vertices
 	thrust::device_vector<vec3f> d_mesh0_tsfmed_vtxs(mesh0_num_vtx);
 	thrust::device_vector<vec3f> d_mesh1_tsfmed_vtxs(mesh1_num_vtx);
-	preprocess_vtxs_kernel<<<(mesh0_num_tri + 32 - 1) / 32, 32>>>(
+	preprocess_vtxs_kernel<<<(mesh0_num_tri + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(
 		thrust::raw_pointer_cast(this->d_vtxs.data()), thrust::raw_pointer_cast(d_mesh0_tsfmed_vtxs.data()),
 		mesh0_num_vtx, thrust::raw_pointer_cast(d_transforms.data())
 	);
-	preprocess_vtxs_kernel<<<(mesh0_num_tri + 32 - 1) / 32, 32>>>(
+	preprocess_vtxs_kernel<<<(mesh0_num_tri + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(
 		thrust::raw_pointer_cast(other->d_vtxs.data()), thrust::raw_pointer_cast(d_mesh1_tsfmed_vtxs.data()),
 		mesh1_num_vtx, thrust::raw_pointer_cast(d_transforms.data()) + 1
 	);
@@ -286,16 +285,14 @@ void kmesh::collide(const kmesh* other, const transf& trf, const transf &trfOthe
 	// preprocess those related to triangles
 	thrust::device_vector<BOX> d_mesh0_tsfmed_bboxes(mesh0_num_tri);
 	thrust::device_vector<BOX> d_mesh1_tsfmed_bboxes(mesh1_num_tri);
-	preprocess_tris_kernel<<<(mesh0_num_tri + 32 - 1) / 32, 32>>>(
+	preprocess_tris_kernel<<<(mesh0_num_tri + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(
 		// thrust::raw_pointer_cast(d_mesh0_bsphs.data()), thrust::raw_pointer_cast(d_mesh0_tsfmed_bsphs.data()),
 		thrust::raw_pointer_cast(this->d_bxs.data()), thrust::raw_pointer_cast(d_mesh0_tsfmed_bboxes.data()),
-		thrust::raw_pointer_cast(d_mesh0_tsfmed_vtxs.data()), thrust::raw_pointer_cast(this->d_tris.data()),
 		mesh0_num_tri, thrust::raw_pointer_cast(d_transforms.data())
 	);
-	preprocess_tris_kernel<<<(mesh1_num_tri + 32 - 1) / 32, 32>>>(
+	preprocess_tris_kernel<<<(mesh1_num_tri + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(
 		// thrust::raw_pointer_cast(d_mesh1_bsphs.data()), thrust::raw_pointer_cast(d_mesh1_tsfmed_bsphs.data()),
 		thrust::raw_pointer_cast(other->d_bxs.data()), thrust::raw_pointer_cast(d_mesh1_tsfmed_bboxes.data()),
-		thrust::raw_pointer_cast(d_mesh1_tsfmed_vtxs.data()), thrust::raw_pointer_cast(other->d_tris.data()),
 		mesh1_num_tri, thrust::raw_pointer_cast(d_transforms.data()) + 1
 	);
 	cudaDeviceSynchronize();
@@ -319,6 +316,186 @@ void kmesh::collide(const kmesh* other, const transf& trf, const transf &trfOthe
 	);
 	cudaDeviceSynchronize();
 
+	getLastCudaError("collide_kernel failed");
+
+	// copy if on gpu
+	thrust::counting_iterator<int> counting(0);
+
+	thrust::device_vector<int> reduced_faces0(mesh0_num_tri);
+	thrust::device_vector<int> reduced_faces1(mesh1_num_tri);
+	auto end0 = thrust::copy_if(
+		counting, 
+		counting + mesh0_num_tri,
+		d_face0.begin(),
+		reduced_faces0.begin(),
+		thrust::identity<int>()
+	);
+	reduced_faces0.resize(end0 - reduced_faces0.begin());
+	auto end1 = thrust::copy_if(
+		counting, 
+		counting + mesh1_num_tri,
+		d_face1.begin(),
+		reduced_faces1.begin(),
+		thrust::identity<int>()
+	);
+	reduced_faces1.resize(end1 - reduced_faces1.begin());
+
+	getLastCudaError("reduce failed");
+
+	// gpu to cpu
+	faces0 = reduced_faces0;
+	faces1 = reduced_faces1;
+}
+
+
+/************************ for bvh ************************/ 
+__device__ bool check_tri(const tri3f *mesh0_tri, const tri3f *mesh1_tri, 
+						const vec3f *mesh0_vtxs, const vec3f *mesh1_vtxs)
+{
+	vec3f p0 = mesh0_vtxs[mesh0_tri->id0()];
+	vec3f p1 = mesh0_vtxs[mesh0_tri->id1()];
+	vec3f p2 = mesh0_vtxs[mesh0_tri->id2()];
+
+	vec3f q0 = mesh1_vtxs[mesh1_tri->id0()];
+	vec3f q1 = mesh1_vtxs[mesh1_tri->id1()];
+	vec3f q2 = mesh1_vtxs[mesh1_tri->id2()];
+
+	// error: collided faces may be set to 0 then
+	// face0[i] = face1[j] = triContact(p0, p1, p2, q0, q1, q2);
+
+	return triContact(p0, p1, p2, q0, q1, q2);
+}
+
+__global__ void BVH_kernel(
+	const vec3f *mesh0_vtxs, const vec3f *mesh1_vtxs,
+	// of this
+	BVHNode *mesh0_leaves, const unsigned int mesh0_num_tri, 
+	// of other
+	BVHNode *mesh1_root,
+	bool *face0, bool *face1
+){
+	int i = blockIdx.x * blockDim.x + threadIdx.x;
+	if (i >= mesh0_num_tri) return;
+
+	tri3f *query_tri = mesh0_leaves[i].tri;
+	BOX *query_box = &mesh0_leaves[i].box;
+
+	BVHNode* stack[32];
+	unsigned int sptr = 0;		// stack pointer, always point to top of the stack (one position ahead)
+	stack[sptr++] = NULL;
+	BVHNode* current = mesh1_root;
+
+	while (current != NULL) {
+		BVHNode* left  = current->left;
+		BVHNode* right = current->right;
+
+		// Check box overlap as indicator of triangle contact
+		bool overlapL = query_box->overlaps(left->box); 
+		bool overlapR = query_box->overlaps(right->box);
+
+		// Check leaf side child if overlapped
+		if (overlapL) {
+			if (left->isLeaf) {
+					if (check_tri(query_tri, left->tri, mesh0_vtxs, mesh1_vtxs)) {
+						// collided
+						face0[i] = 1;
+						face1[left->idx] = 1;
+					}
+			}
+			else {
+				stack[sptr++] = left;
+			}
+		}
+
+		// Check right side child if overlapped
+		if (overlapR) {
+			if (right->isLeaf) {
+					if (check_tri(query_tri, right->tri, mesh0_vtxs, mesh1_vtxs)) {
+						// collided
+						face0[i] = 1;
+						face1[right->idx] = 1;
+					}
+			}
+			else {
+				stack[sptr++] = right;
+			}
+		}
+
+		// Pop out whatever
+		current = stack[--sptr];
+	}
+	
+}
+
+// preprocess those related to triangles
+__global__ void preprocess_tris_kernel(
+									BVHNode *leaves,
+									BVHNode *inters,
+									const unsigned int num_tris,
+									const transf *transforms
+									)
+{
+	int i = blockIdx.x * blockDim.x + threadIdx.x;
+	if (i >= num_tris) return;
+
+	// transform is relative to the original pose
+	leaves[i].box = leaves[i].obox;
+	leaves[i].box.applyTransform(*transforms);
+	if (i == num_tris - 1) return;
+	inters[i].box = inters[i].obox;
+	inters[i].box.applyTransform(*transforms);
+}
+
+void kmesh::collide_bvh(kmesh* other, const transf& trf, const transf &trfOther, thrust::host_vector<int, INT_PINNED>& faces0, thrust::host_vector<int, INT_PINNED>& faces1){
+	// in total: this->_num_tri * other->_num_tri
+	// in fact a combination of cartesian product
+	const unsigned int mesh0_num_tri = this->getNbFaces();
+	const unsigned int mesh1_num_tri = other->getNbFaces();
+	const unsigned int mesh0_num_vtx = this->getNbVertices();
+	const unsigned int mesh1_num_vtx = other->getNbVertices();
+
+	// custom object should be transferred explicitly to gpu
+	thrust::device_vector<transf> d_transforms(2);
+	d_transforms[0] = trf;
+	d_transforms[1] = trfOther;
+
+	// preprocess those related to vertices
+	thrust::device_vector<vec3f> d_mesh0_tsfmed_vtxs(mesh0_num_vtx);
+	thrust::device_vector<vec3f> d_mesh1_tsfmed_vtxs(mesh1_num_vtx);
+	preprocess_vtxs_kernel<<<(mesh0_num_tri + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(
+		thrust::raw_pointer_cast(this->d_vtxs.data()), thrust::raw_pointer_cast(d_mesh0_tsfmed_vtxs.data()),
+		mesh0_num_vtx, thrust::raw_pointer_cast(d_transforms.data())
+	);
+	preprocess_vtxs_kernel<<<(mesh0_num_tri + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(
+		thrust::raw_pointer_cast(other->d_vtxs.data()), thrust::raw_pointer_cast(d_mesh1_tsfmed_vtxs.data()),
+		mesh1_num_vtx, thrust::raw_pointer_cast(d_transforms.data()) + 1
+	);
+	cudaDeviceSynchronize();
+	getLastCudaError("preprocess vertices failed");
+
+	// preprocess those related to triangles
+	thrust::device_vector<BOX> d_mesh1_tsfmed_bboxes(mesh1_num_tri);
+	preprocess_tris_kernel<<<(mesh0_num_tri + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(
+		thrust::raw_pointer_cast(this->d_leaves_bvh.data()), thrust::raw_pointer_cast(this->d_inters_bvh.data()),
+		mesh0_num_tri, thrust::raw_pointer_cast(d_transforms.data())
+	);
+	preprocess_tris_kernel<<<(mesh1_num_tri + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(
+		thrust::raw_pointer_cast(other->d_leaves_bvh.data()), thrust::raw_pointer_cast(other->d_inters_bvh.data()),
+		mesh1_num_tri, thrust::raw_pointer_cast(d_transforms.data()) + 1
+	);
+	cudaDeviceSynchronize();
+	getLastCudaError("preprocess triangles failed");
+
+	// kernel
+	thrust::device_vector<bool> d_face0(mesh0_num_tri, 0);
+	thrust::device_vector<bool> d_face1(mesh1_num_tri, 0);
+	BVH_kernel<<<(mesh0_num_tri + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK, THREADS_PER_BLOCK>>>(
+		thrust::raw_pointer_cast(d_mesh0_tsfmed_vtxs.data()), thrust::raw_pointer_cast(d_mesh1_tsfmed_vtxs.data()), 
+		thrust::raw_pointer_cast(this->d_leaves_bvh.data()), mesh0_num_tri,
+		thrust::raw_pointer_cast(other->d_inters_bvh.data()),
+		thrust::raw_pointer_cast(d_face0.data()), thrust::raw_pointer_cast(d_face1.data())
+	);
+	cudaDeviceSynchronize();
 	getLastCudaError("collide_kernel failed");
 
 	// copy if on gpu

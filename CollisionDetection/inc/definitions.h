@@ -41,9 +41,11 @@
 #endif
 
 #define USE_GPU
+#define USE_BVH
 
 #define MORTON_CODE_64
 typedef unsigned long long morton;
+#define THREADS_PER_BLOCK 64 // for one-dimension
 
 // REAL
 #define USE_DOUBLE

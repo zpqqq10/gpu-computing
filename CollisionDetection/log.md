@@ -17,6 +17,10 @@ success:
 8. 用aabb替代bounding sphere，估计是距离的计算比较耗时而且球形不如立方体贴合三角形面片: ~0.034 s
 所有的源文件都要以cu结尾，不然nvcc可能会以gcc编译头文件，导致头文件的对象不能有device_vector成员
 
+9. 加了bvh的排序部分后，速度又快了一点: ~0.030 s
+
+10. using bvh: ~0.003 s
+
 
 fail:
 
